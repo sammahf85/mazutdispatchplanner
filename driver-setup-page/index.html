@@ -76,6 +76,18 @@
       <a id="copy" class="btn alt" href="#">Didn't work? Copy the settings link</a>
       <div class="small" id="copyMsg"></div>
     </div>
+
+    <div class="step">
+      <h2>🔧 Not connecting? Test this phone</h2>
+      <div>If OwnTracks says <b>Idle</b> or <b>"The operation couldn't be completed"</b>, tap the button to check whether this phone can reach the company's location server.</div>
+      <div class="ar">إذا ظهر في OwnTracks <b>Idle</b> أو رسالة خطأ، اضغط الزر لفحص اتصال هذا الهاتف بخادم الموقع.</div>
+      <a id="testBtn" class="btn" href="#">🔍 Test connection</a>
+      <div id="testResult"></div>
+      <h2 style="margin-top:16px">✍ Settings to enter by hand</h2>
+      <div class="small">OwnTracks → <b>ⓘ</b> → <b>Settings</b>. Tap <b>Copy</b>, then paste into the field in OwnTracks (no spaces).</div>
+      <div class="ar">في OwnTracks ← <b>ⓘ</b> ← <b>Settings</b>. اضغط <b>Copy</b> ثم الصق في الحقل (بدون مسافات).</div>
+      <table id="manual" style="width:100%;border-collapse:collapse;margin-top:8px;font-size:15px"></table>
+    </div>
   </div>
 </main>
 <script>
@@ -123,6 +135,58 @@
   document.getElementById('permAr').innerHTML = ios
     ? 'افتح <b>الإعدادات</b> في الآيفون ← <b>OwnTracks</b> ← <b>الموقع</b> ← اختر <b>دائماً</b>، وفعّل <b>الموقع الدقيق</b> و<b>تحديث التطبيقات في الخلفية</b>. أوقف وضع توفير الطاقة أثناء العمل.'
     : 'عند السؤال اختر <b>السماح طوال الوقت</b>. ثم: <b>الإعدادات ← التطبيقات ← OwnTracks ← البطارية ← غير مقيّد</b> حتى يعمل في الخلفية.';
+  // ---- settings to type by hand, each with a Copy button
+  var rows = [['Mode', 'MQTT', false], ['Host', cfg.host, true], ['Port', String(cfg.port), true], ['TLS', 'ON', false],
+    ['Authentication', cfg.auth ? 'ON' : 'OFF', false], ['UserID', cfg.username, true]];
+  if (cfg.auth) rows.push(['Password', cfg.password, true]);
+  rows.push(['DeviceID', cfg.deviceId, true], ['TrackerID', cfg.tid, true], ['Secret encryption key', cfg.encryptionKey, true]);
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); };
+  var tbl = document.getElementById('manual');
+  tbl.innerHTML = rows.map(function (r, i) {
+    return '<tr style="border-top:1px solid #eef1f5"><td style="padding:6px 4px;color:#6b7385">' + r[0] + '</td><td style="padding:6px 4px;word-break:break-all"><b>' + esc(r[1]) + '</b></td><td style="text-align:right">' +
+      (r[2] ? '<a href="#" data-i="' + i + '" style="display:inline-block;padding:6px 10px;border:1px solid #cfd5e1;border-radius:8px;text-decoration:none;color:#1d2433;font-size:14px">Copy</a>' : '') + '</td></tr>';
+  }).join('');
+  tbl.onclick = function (e) {
+    var a = e.target.closest ? e.target.closest('a[data-i]') : null; if (!a) return;
+    e.preventDefault(); var v = rows[+a.getAttribute('data-i')][1];
+    var ok = function () { a.textContent = '✓ Copied'; setTimeout(function () { a.textContent = 'Copy'; }, 2000); };
+    if (navigator.clipboard) navigator.clipboard.writeText(v).then(ok, function () { prompt('Copy:', v); }); else prompt('Copy:', v);
+  };
+
+  // ---- connection test: same server name as OwnTracks; opens a secure WebSocket and logs in with MQTT (CONNECT → CONNACK)
+  function mqttConnectPacket(id) {
+    var b = [0, 4, 77, 81, 84, 84, 4, 2, 0, 30, 0, id.length];
+    for (var i = 0; i < id.length; i++) b.push(id.charCodeAt(i));
+    return new Uint8Array([16, b.length].concat(b));
+  }
+  function testConnection(done) {
+    var t0 = Date.now(), finished = false, ws;
+    var end = function (ok, why) { if (finished) return; finished = true; try { ws.close(); } catch (e) {} done(ok, why, Date.now() - t0); };
+    try { ws = new WebSocket('wss://' + cfg.host + ':8884/mqtt', ['mqtt']); } catch (e) { return end(false, 'bad address'); }
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = function () { ws.send(mqttConnectPacket('test' + Math.random().toString(36).slice(2, 12))); };
+    ws.onmessage = function (m) { var d = new Uint8Array(m.data); end(d[0] === 32 && d[3] === 0, d[0] === 32 ? 'login refused (' + d[3] + ')' : 'unexpected answer'); };
+    ws.onerror = function () { end(false, 'could not connect'); };
+    ws.onclose = function () { end(false, 'connection closed'); };
+    setTimeout(function () { end(false, 'no answer in 12 seconds'); }, 12000);
+  }
+  var res = document.getElementById('testResult');
+  document.getElementById('testBtn').onclick = function (e) {
+    e.preventDefault();
+    res.innerHTML = '<p>⏳ Testing… / جارٍ الفحص…</p>';
+    testConnection(function (ok, why, ms) {
+      res.innerHTML = ok
+        ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:12px;padding:12px;margin-top:8px">✅ <b>This phone can reach the server</b> (' + ms + ' ms). ' +
+          'So the internet is fine – the problem is in the OwnTracks settings. Open OwnTracks → ⓘ → Settings and use the <b>Copy</b> buttons below for every field ' +
+          '(especially <b>Host</b> – delete it completely first, then paste). Then go back to the map and tap the <b>upload</b> button.' +
+          '<div class="ar">✅ الهاتف يصل إلى الخادم. المشكلة في إعدادات OwnTracks – امسح كل حقل والصق القيمة من أزرار <b>Copy</b> أدناه، خاصة <b>Host</b>، ثم اضغط زر الإرسال في الخريطة.</div></div>'
+        : '<div class="bad" style="margin-top:8px">❌ <b>This phone cannot reach the server</b> (' + why + '). Try, then tap Test again:<ul>' +
+          '<li>Switch <b>Wi-Fi off</b> and use mobile data.</li><li>Turn off any <b>VPN</b>, ad-blocker, and iCloud <b>Private Relay</b> (Settings → your name → iCloud → Private Relay).</li>' +
+          '<li>Check Settings → <b>OwnTracks</b> → <b>Mobile Data</b> is ON.</li><li>Open any website to check the internet works.</li></ul>' +
+          '<div class="ar">❌ الهاتف لا يصل إلى الخادم. أوقف الواي فاي واستخدم بيانات الهاتف، أوقف أي VPN أو Private Relay، وتأكد أن بيانات الهاتف مفعّلة لتطبيق OwnTracks، ثم أعد الفحص.</div></div>';
+    });
+  };
+
   document.getElementById('copy').onclick = function (e) {
     e.preventDefault();
     var done = function () { document.getElementById('copyMsg').textContent = 'Copied. Paste it in the browser address bar (Safari / Chrome) and open it, or send it back to the office.'; };
