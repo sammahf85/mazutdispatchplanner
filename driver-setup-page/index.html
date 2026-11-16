@@ -22,6 +22,7 @@
   ul{margin:6px 0;padding-left:20px} .ar ul{padding-left:0;padding-right:20px}
   .small{font-size:14px;color:#6b7385}
   .bad{background:#fee2e2;border:1px solid #fca5a5;border-radius:12px;padding:14px}
+  .warn{background:#fef3c7;border:1px solid #fcd34d;border-radius:12px;padding:14px;margin-bottom:14px}
   .hide{display:none}
 </style>
 </head>
@@ -40,6 +41,14 @@
   </div>
 
   <div id="steps" class="hide">
+    <div id="inapp" class="warn hide">
+      <b>⚠ Open this page in Safari.</b> It is now open inside another app, so the green button will show <b>"unsupported URL"</b>.
+      Tap the button below to copy this page's address, open <b>Safari</b>, paste it in the address bar and continue there.
+      <a id="copyPage" class="btn alt" href="#">📋 Copy this page's address</a>
+      <div class="small" id="copyPageMsg"></div>
+      <div class="ar"><b>⚠ افتح هذه الصفحة في Safari.</b> الصفحة مفتوحة الآن داخل تطبيق آخر، لذلك سيظهر الخطأ <b>"unsupported URL"</b> عند الضغط على الزر الأخضر. اضغط الزر لنسخ عنوان الصفحة، ثم افتح <b>Safari</b> والصقه في شريط العنوان وتابع من هناك.</div>
+    </div>
+
     <div class="step">
       <h2><span class="n">1</span> Install OwnTracks</h2>
       <div>Install the free app <b>OwnTracks</b>. Already installed? Go to step 2.</div>
@@ -53,6 +62,9 @@
       <a id="open" class="btn go" href="#">▶ Open in OwnTracks</a>
       <div class="small" id="openHelp"></div>
       <div class="ar">اضغط الزر الأخضر. سيفتح تطبيق OwnTracks ويطلب استيراد الإعدادات – اضغط <b>Import / OK</b>.</div>
+      <a id="file" class="btn alt" href="#">Green button gives an error? Send the settings file to OwnTracks</a>
+      <div class="small" id="fileMsg"></div>
+      <div class="ar">الزر الأخضر يعطي خطأ؟ اضغط هذا الزر لإرسال ملف الإعدادات إلى OwnTracks.</div>
     </div>
 
     <div class="step">
@@ -78,14 +90,34 @@
     </div>
 
     <div class="step">
+      <h2>🚫 Error "unsupported URL"?</h2>
+      <ul>
+        <li><b>You see it in the browser after tapping the green button:</b> OwnTracks is not installed yet (do step 1 and open the app once),
+          or this page is open inside another app. Open the page in <b>Safari</b> (iPhone) or <b>Chrome</b> (Android), or use the
+          <b>settings file</b> button in step 2.</li>
+        <li><b>You see it inside OwnTracks (ⓘ → Status):</b> OwnTracks is still in <b>HTTP</b> mode, so the company settings were not imported.
+          Open OwnTracks → <b>ⓘ</b> → <b>Settings</b> → <b>Mode</b> → choose <b>MQTT</b>. Then come back here and tap the green button again,
+          or fill in the settings by hand from the table below.</li>
+      </ul>
+      <div class="ar">
+        <ul>
+          <li><b>يظهر الخطأ في المتصفح بعد الضغط على الزر الأخضر:</b> تطبيق OwnTracks غير مثبّت (نفّذ الخطوة 1 وافتح التطبيق مرة واحدة)، أو الصفحة مفتوحة داخل تطبيق آخر.
+            افتح الصفحة في <b>Safari</b> (آيفون) أو <b>Chrome</b> (أندرويد)، أو استخدم زر <b>ملف الإعدادات</b> في الخطوة 2.</li>
+          <li><b>يظهر الخطأ داخل OwnTracks (ⓘ ← Status):</b> التطبيق ما زال على وضع <b>HTTP</b> ولم يتم استيراد إعدادات الشركة.
+            افتح OwnTracks ← <b>ⓘ</b> ← <b>Settings</b> ← <b>Mode</b> ← اختر <b>MQTT</b>. ثم ارجع إلى هنا واضغط الزر الأخضر مرة أخرى، أو أدخل الإعدادات يدوياً من الجدول أدناه.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="step">
       <h2>🔧 Not connecting? Test this phone</h2>
       <div>If OwnTracks says <b>Idle</b> or <b>"The operation couldn't be completed"</b>, tap the button to check whether this phone can reach the company's location server.</div>
       <div class="ar">إذا ظهر في OwnTracks <b>Idle</b> أو رسالة خطأ، اضغط الزر لفحص اتصال هذا الهاتف بخادم الموقع.</div>
       <a id="testBtn" class="btn" href="#">🔍 Test connection</a>
       <div id="testResult"></div>
       <h2 style="margin-top:16px">✍ Settings to enter by hand</h2>
-      <div class="small">OwnTracks → <b>ⓘ</b> → <b>Settings</b>. Tap <b>Copy</b>, then paste into the field in OwnTracks (no spaces).</div>
-      <div class="ar">في OwnTracks ← <b>ⓘ</b> ← <b>Settings</b>. اضغط <b>Copy</b> ثم الصق في الحقل (بدون مسافات).</div>
+      <div class="small">OwnTracks → <b>ⓘ</b> → <b>Settings</b>. First set <b>Mode</b> to <b>MQTT</b>. Then tap <b>Copy</b> and paste into the field in OwnTracks (no spaces).</div>
+      <div class="ar">في OwnTracks ← <b>ⓘ</b> ← <b>Settings</b>. أولاً اختر <b>Mode: MQTT</b>. ثم اضغط <b>Copy</b> والصق في الحقل (بدون مسافات).</div>
       <table id="manual" style="width:100%;border-collapse:collapse;margin-top:8px;font-size:15px"></table>
     </div>
   </div>
@@ -127,7 +159,7 @@
   store.href = ios ? APPSTORE : PLAY;
   store.textContent = ios ? '⬇ Install OwnTracks (App Store)' : android ? '⬇ Install OwnTracks (Google Play)' : '⬇ Install OwnTracks';
   document.getElementById('openHelp').textContent = ios
-    ? 'If nothing happens: install OwnTracks first (step 1), open it once, then come back to this message and tap the green button again.'
+    ? 'If nothing happens or you see "unsupported URL": install OwnTracks first (step 1), open it once, then come back to this message and tap the green button again.'
     : 'If the Play Store opens instead: install OwnTracks, open it once, then come back to this message and tap the green button again.';
   document.getElementById('perm').innerHTML = ios
     ? 'Open the iPhone <b>Settings</b> app → <b>OwnTracks</b> → <b>Location</b> → choose <b>Always</b>, and turn on <b>Precise Location</b> and <b>Background App Refresh</b>. Turn off Low Power Mode while working.'
@@ -135,8 +167,44 @@
   document.getElementById('permAr').innerHTML = ios
     ? 'افتح <b>الإعدادات</b> في الآيفون ← <b>OwnTracks</b> ← <b>الموقع</b> ← اختر <b>دائماً</b>، وفعّل <b>الموقع الدقيق</b> و<b>تحديث التطبيقات في الخلفية</b>. أوقف وضع توفير الطاقة أثناء العمل.'
     : 'عند السؤال اختر <b>السماح طوال الوقت</b>. ثم: <b>الإعدادات ← التطبيقات ← OwnTracks ← البطارية ← غير مقيّد</b> حتى يعمل في الخلفية.';
+
+  // ---- iPhone: a page opened inside another app (not Safari / Chrome) cannot open OwnTracks – it shows "unsupported URL"
+  if (ios && !/Safari\//.test(ua)) {
+    document.getElementById('inapp').className = 'warn';
+    document.getElementById('copyPage').onclick = function (e) {
+      e.preventDefault();
+      var done = function () { document.getElementById('copyPageMsg').textContent = 'Copied. Now open Safari and paste it in the address bar.'; };
+      if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(done, function () { prompt('Copy this address:', location.href); });
+      else prompt('Copy this address:', location.href);
+    };
+  }
+
+  // ---- second way in: the same settings as a file (.otrc) that OwnTracks opens directly
+  var otrcName = 'owntracks-' + cfg.deviceId + '.otrc', otrcText = JSON.stringify(cfg, null, 2);
+  document.getElementById('file').onclick = function (e) {
+    e.preventDefault();
+    var msg = document.getElementById('fileMsg');
+    var saveFile = function () {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([otrcText], {type: 'application/octet-stream'}));
+      a.download = otrcName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      msg.textContent = ios
+        ? 'File saved. Open the Files app → Downloads → hold the file → Share → OwnTracks.'
+        : 'File saved. Open OwnTracks → ☰ → Configuration management → Import, and choose the file ' + otrcName + '.';
+    };
+    try {
+      var f = new File([otrcText], otrcName, {type: 'application/json'});
+      if (navigator.canShare && navigator.canShare({files: [f]})) {
+        msg.textContent = 'In the list of apps choose OwnTracks.';
+        navigator.share({files: [f]}).then(function () {}, function (err) { if (!err || err.name !== 'AbortError') saveFile(); });
+        return;
+      }
+    } catch (err) {}
+    saveFile();
+  };
+
   // ---- settings to type by hand, each with a Copy button
-  var rows = [['Mode', 'MQTT', false], ['Host', cfg.host, true], ['Port', String(cfg.port), true], ['TLS', 'ON', false],
+  var rows = [['Mode', 'MQTT (not HTTP)', false], ['Host', cfg.host, true], ['Port', String(cfg.port), true], ['TLS', 'ON', false],
     ['Authentication', cfg.auth ? 'ON' : 'OFF', false], ['UserID', cfg.username, true]];
   if (cfg.auth) rows.push(['Password', cfg.password, true]);
   rows.push(['DeviceID', cfg.deviceId, true], ['TrackerID', cfg.tid, true], ['Secret encryption key', cfg.encryptionKey, true]);
@@ -177,9 +245,9 @@
     testConnection(function (ok, why, ms) {
       res.innerHTML = ok
         ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:12px;padding:12px;margin-top:8px">✅ <b>This phone can reach the server</b> (' + ms + ' ms). ' +
-          'So the internet is fine – the problem is in the OwnTracks settings. Open OwnTracks → ⓘ → Settings and use the <b>Copy</b> buttons below for every field ' +
+          'So the internet is fine – the problem is in the OwnTracks settings. Open OwnTracks → ⓘ → Settings, set <b>Mode</b> to <b>MQTT</b>, and use the <b>Copy</b> buttons below for every field ' +
           '(especially <b>Host</b> – delete it completely first, then paste). Then go back to the map and tap the <b>upload</b> button.' +
-          '<div class="ar">✅ الهاتف يصل إلى الخادم. المشكلة في إعدادات OwnTracks – امسح كل حقل والصق القيمة من أزرار <b>Copy</b> أدناه، خاصة <b>Host</b>، ثم اضغط زر الإرسال في الخريطة.</div></div>'
+          '<div class="ar">✅ الهاتف يصل إلى الخادم. المشكلة في إعدادات OwnTracks – اختر <b>Mode: MQTT</b>، ثم امسح كل حقل والصق القيمة من أزرار <b>Copy</b> أدناه، خاصة <b>Host</b>، ثم اضغط زر الإرسال في الخريطة.</div></div>'
         : '<div class="bad" style="margin-top:8px">❌ <b>This phone cannot reach the server</b> (' + why + '). Try, then tap Test again:<ul>' +
           '<li>Switch <b>Wi-Fi off</b> and use mobile data.</li><li>Turn off any <b>VPN</b>, ad-blocker, and iCloud <b>Private Relay</b> (Settings → your name → iCloud → Private Relay).</li>' +
           '<li>Check Settings → <b>OwnTracks</b> → <b>Mobile Data</b> is ON.</li><li>Open any website to check the internet works.</li></ul>' +
