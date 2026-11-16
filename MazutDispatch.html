@@ -335,6 +335,14 @@
         <button class="b" onclick="resetAll()">⚠ Erase everything</button>
       </div>
       <input type="file" id="bkFile" accept=".json" hidden onchange="restore(this)">
+      <h2 style="margin-top:16px">Automatic daily backup (Excel)</h2>
+      <p class="hint">Every day at <b>7:00 pm Lebanon time</b> the program saves an Excel file (orders, clients, trucks, depots, trips, settings) into the <b>backup</b> folder on the Desktop of this computer.
+        Choose the folder once on each computer. The program must be open at 7 pm; if it was closed, the backup is made the next time you open it.</p>
+      <div class="actions">
+        <button class="b p" onclick="chooseBackupFolder()">📁 Choose backup folder</button>
+        <button class="b" onclick="runBackup(true)">💾 Back up now (Excel)</button>
+      </div>
+      <p class="hint" id="bkStatus"></p>
     </div>
   </div>
 </section>
@@ -1827,6 +1835,160 @@ function loadDemo() {
   });
   save(); fillSettings(); renderAll(); drawMap(true); showTab('requests');
 }
+/* ===================== automatic daily backup (Excel file, every day at 7 pm Lebanon time) ===================== */
+const BK_KEY = KEY + '.autoBackup', BK_HOUR = 19, BK_TZ = 'Asia/Beirut';
+let bkDir = null, bkBusy = false, bkRetryAt = 0;
+const bkState = () => { try { return JSON.parse(localStorage.getItem(BK_KEY)) || {}; } catch (e) { return {}; } };
+const bkSet = o => localStorage.setItem(BK_KEY, JSON.stringify({...bkState(), ...o}));
+function beirutNow() {   // the date and hour in Lebanon, whatever the clock of this computer says
+  const p = {};
+  new Intl.DateTimeFormat('en-CA', {timeZone: BK_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23'})
+    .formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+  return {date: `${p.year}-${p.month}-${p.day}`, hour: +p.hour % 24};
+}
+function bkDue() {   // the latest 7 pm that has already passed
+  const n = beirutNow();
+  return n.hour >= BK_HOUR ? n.date : new Date(Date.parse(n.date + 'T12:00:00Z') - 864e5).toISOString().slice(0, 10);
+}
+function bkIdb(mode, fn) {
+  return new Promise((res, rej) => {
+    const o = indexedDB.open('mazutDispatchBackup', 1);
+    o.onupgradeneeded = () => o.result.createObjectStore('kv');
+    o.onerror = () => rej(o.error);
+    o.onsuccess = () => { const tx = o.result.transaction('kv', mode), rq = fn(tx.objectStore('kv')); tx.oncomplete = () => res(rq.result); tx.onerror = () => rej(tx.error); };
+  });
+}
+function xlsxFile(sheets) {   // sheets: [{name, rows: [[cell, …], …]}] → the bytes of an Excel .xlsx file
+  const x = s => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const col = n => { let s = ''; for (n++; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; };
+  const NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"', REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const sheetXml = rows => {
+    const n = Math.max(1, ...rows.map(r => r.length));
+    let cols = '';
+    for (let j = 0; j < n; j++) {
+      const w = Math.min(50, Math.max(10, ...rows.map(r => String(r[j] == null ? '' : r[j]).length + 2)));
+      cols += `<col min="${j + 1}" max="${j + 1}" width="${w}" customWidth="1"/>`;
+    }
+    return `${XML}<worksheet ${NS}><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${cols}</cols><sheetData>` +
+      rows.map((r, i) => `<row r="${i + 1}">` + r.map((v, j) => {
+        const at = `r="${col(j)}${i + 1}"${i ? '' : ' s="1"'}`;
+        if (typeof v === 'number' && isFinite(v)) return `<c ${at}><v>${v}</v></c>`;
+        if (v == null || v === '') return '';
+        return `<c ${at} t="inlineStr"><is><t xml:space="preserve">${x(v)}</t></is></c>`;
+      }).join('') + '</row>').join('') + '</sheetData></worksheet>';
+  };
+  const files = [
+    ['[Content_Types].xml', `${XML}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
+      sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '</Types>'],
+    ['_rels/.rels', `${XML}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml', `${XML}<workbook ${NS} xmlns:r="${REL}"><sheets>` + sheets.map((s, i) => `<sheet name="${x(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets></workbook>'],
+    ['xl/_rels/workbook.xml.rels', `${XML}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` + sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="${REL}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('') +
+      `<Relationship Id="rId${sheets.length + 1}" Type="${REL}/styles" Target="styles.xml"/></Relationships>`],
+    ['xl/styles.xml', `${XML}<styleSheet ${NS}><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`]
+  ].concat(sheets.map((s, i) => [`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s.rows)]));
+  // pack the parts into a zip (stored, no compression)
+  const enc = new TextEncoder(), table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; table[n] = c >>> 0; }
+  const crc = b => { let c = ~0; for (let i = 0; i < b.length; i++) c = table[(c ^ b[i]) & 255] ^ (c >>> 8); return ~c >>> 0; };
+  const u16 = n => [n & 255, n >>> 8 & 255], u32 = n => [n & 255, n >>> 8 & 255, n >>> 16 & 255, n >>> 24 & 255];
+  const d = new Date(), stamp = u16(d.getHours() << 11 | d.getMinutes() << 5 | d.getSeconds() >> 1).concat(u16(Math.max(0, d.getFullYear() - 1980) << 9 | (d.getMonth() + 1) << 5 | d.getDate()));
+  const chunks = [], central = []; let off = 0;
+  files.forEach(([name, text]) => {
+    const nb = enc.encode(name), data = enc.encode(text);
+    const head = [...u16(20), ...u16(0x800), ...u16(0), ...stamp, ...u32(crc(data)), ...u32(data.length), ...u32(data.length), ...u16(nb.length), ...u16(0)];
+    const local = new Uint8Array([0x50, 0x4B, 3, 4, ...head, ...nb]);
+    central.push(new Uint8Array([0x50, 0x4B, 1, 2, ...u16(20), ...head, ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off), ...nb]));
+    chunks.push(local, data); off += local.length + data.length;
+  });
+  const cdSize = central.reduce((a, c) => a + c.length, 0);
+  chunks.push(...central, new Uint8Array([0x50, 0x4B, 5, 6, 0, 0, 0, 0, ...u16(files.length), ...u16(files.length), ...u32(cdSize), ...u32(off), 0, 0]));
+  const out = new Uint8Array(off + cdSize + 22); let p = 0;
+  chunks.forEach(c => { out.set(c, p); p += c.length; });
+  return out;
+}
+function backupSheets() {
+  const dep = id => (depotById(id) || {}).name || '', yn = v => v ? 'Yes' : 'No', u = S.settings.unit || 'L';
+  const when = v => { const ms = typeof v === 'string' ? Date.parse(v) : v; return ms ? fmtWhen(ms) : ''; };
+  const trips = [['Truck', 'Plate', 'Driver', 'Trip no.', 'Status', 'Depot', 'Departure', 'Return', 'Distance (km)', `Load (${u})`, 'Stop no.', 'Client', 'Phone', 'Address', `Quantity (${u})`, 'Notes', 'Completed at']];
+  ((S.plan && S.plan.routes) || []).forEach(r => (r.stops || []).forEach((s, i) => trips.push([r.truckName, r.plate, r.driver, r.tripNo, r.status, r.depotName, when(r.depart), when(r.ret),
+    Math.round(r.km * 10) / 10, r.load, i + 1, s.client, s.phone, s.address, s.qty, s.notes, when(r.doneAt)])));
+  return [
+    {name: 'Orders', rows: [['Client', 'Phone', 'Address', `Quantity (${u})`, 'Urgent', 'Active', 'Notes', 'Depot', 'Latitude', 'Longitude']]
+      .concat(S.requests.map(q => [q.client, q.phone, q.address, q.qty, yn(q.urgent), yn(q.active !== false), q.notes, dep(q.depotId), q.lat, q.lng]))},
+    {name: 'Clients', rows: [['Client', 'Phone', 'Address', 'Notes', 'Depot', 'Latitude', 'Longitude']]
+      .concat(S.clients.map(c => [c.name, c.phone, c.address, c.notes, dep(c.depotId), c.lat, c.lng]))},
+    {name: 'Trucks', rows: [['Truck', 'Plate', 'Driver', 'Driver phone', `Capacity (${u})`, 'Active', 'Depot', 'Tracking ID']]
+      .concat(S.trucks.map(t => [t.name, t.plate, t.driver, t.phone, t.cap, yn(t.active !== false), dep(t.depotId), t.trackId]))},
+    {name: 'Depots', rows: [['Depot', 'Address', 'Latitude', 'Longitude']].concat(S.depots.map(p => [p.name, p.address, p.lat, p.lng]))},
+    {name: 'Trips', rows: trips},
+    {name: 'Settings', rows: [['Setting', 'Value'], ['Company', S.settings.company], ['Backup made', fmtWhen(Date.now())]]
+      .concat(Object.entries(S.settings).filter(([k, v]) => k !== 'company' && (v == null || typeof v !== 'object')).map(([k, v]) => [k, typeof v === 'boolean' ? yn(v) : v]))}
+  ];
+}
+function showBkBar(text, onClick) {
+  let b = $('#bkBar');
+  if (!text) { if (b) b.remove(); return; }
+  if (!b) {
+    b = document.createElement('div'); b.id = 'bkBar';
+    b.style.cssText = 'position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:9999;background:#1d2433;color:#fff;padding:12px 18px;border-radius:12px;box-shadow:0 4px 16px #0005;cursor:pointer;font-weight:600;max-width:92vw;text-align:center';
+    document.body.appendChild(b);
+  }
+  b.textContent = text; b.onclick = onClick || null;
+}
+function renderBackup() {
+  const el = $('#bkStatus'); if (!el) return;
+  const st = bkState();
+  const where = bkDir ? `Saving into the folder “${bkDir.name}”.` : window.showDirectoryPicker ? 'No folder chosen yet – press “Choose backup folder”.' : 'This browser saves the backup in the Downloads folder (use Chrome or Edge to save into the backup folder).';
+  el.textContent = where + (st.lastAt ? ` Last backup: ${fmtWhen(st.lastAt)} (${st.lastName}).` : ' No backup made yet.');
+}
+async function chooseBackupFolder() {
+  if (!window.showDirectoryPicker) return alert('This browser cannot save into a folder by itself.\nOpen the program in Chrome or Edge to save into the backup folder.\nUntil then the daily Excel backup goes to the Downloads folder.');
+  alert('In the next window:\n1. Click Desktop.\n2. If there is no folder named "backup", make one (New folder → backup).\n3. Open the backup folder and press "Select Folder", then allow saving.');
+  let dir;
+  try { dir = await showDirectoryPicker({id: 'mazutBackup', mode: 'readwrite', startIn: 'desktop'}); } catch (e) { return; }
+  try {
+    if (dir.name.toLowerCase() !== 'backup') dir = await dir.getDirectoryHandle('backup', {create: true});
+    bkDir = dir; await bkIdb('readwrite', s => s.put(dir, 'dir'));
+  } catch (e) { return alert('This folder cannot be used: ' + e.message); }
+  await runBackup(true); renderBackup();
+}
+async function runBackup(manual) {
+  const name = `mazut-backup-${beirutNow().date}.xlsx`, due = bkDue();
+  const done = () => { bkSet({last: due, lastAt: Date.now(), lastName: name}); showBkBar(''); renderBackup(); };
+  try {
+    const bytes = xlsxFile(backupSheets());
+    if (bkDir) {
+      let perm = await bkDir.queryPermission({mode: 'readwrite'});
+      if (perm !== 'granted' && manual) perm = await bkDir.requestPermission({mode: 'readwrite'});
+      if (perm !== 'granted') return showBkBar('💾 The daily backup is ready – click here to save it in the backup folder.', () => runBackup(true));
+      const put = async (n, data) => { const w = await (await bkDir.getFileHandle(n, {create: true})).createWritable(); await w.write(data); await w.close(); };
+      await put(name, bytes);
+      await put(name.replace(/xlsx$/, 'json'), JSON.stringify(S, null, 2));   // the same data in the format "Restore backup" reads
+      return done();
+    }
+    if (window.showDirectoryPicker) {
+      if (manual) return chooseBackupFolder();
+      return showBkBar('💾 Daily backup: choose the "backup" folder on the Desktop once – click here.', chooseBackupFolder);
+    }
+    download(name, bytes, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); done();
+  } catch (e) {
+    bkRetryAt = Date.now() + 600000;
+    showBkBar('⚠ The backup could not be saved (' + e.message + '). Click here to try again.', () => { bkRetryAt = 0; runBackup(true); });
+  }
+}
+async function backupTick() {
+  if (bkBusy || Date.now() < bkRetryAt) return;
+  if (!S.depots.length && !S.trucks.length && !S.requests.length && !S.clients.length) return;
+  const st = bkState();
+  if (st.last && st.last >= bkDue()) return;
+  bkBusy = true;
+  try { await runBackup(false); } finally { bkBusy = false; }
+}
+(async () => {
+  try { if (window.showDirectoryPicker) bkDir = (await bkIdb('readonly', s => s.get('dir'))) || null; } catch (e) {}
+  renderBackup(); backupTick(); setInterval(backupTick, 30000);
+})();
 function renderAll() { fillDepotSelects(); renderRequests(); renderClients(); renderTrucks(); renderDepots(); renderPlan(); drawMap(); renderLive(); drawLive(); }
 
 fillSettings(); fillLiveSettings(); initPlanInputs(); renderAll(); drawMap(true);
