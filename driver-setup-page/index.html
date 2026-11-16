@@ -28,9 +28,15 @@
 <body>
 <header><h1>📡 Live location setup</h1><p id="who"></p></header>
 <main>
+  <div id="plain" class="step hide">
+    <h2>👋 Driver phone setup</h2>
+    <div>This page sets up live location on a driver's phone. Please open the <b>personal link</b> the office sent you on WhatsApp
+      – tap the link inside the message, on your phone.</div>
+    <div class="ar">هذه الصفحة لإعداد الموقع المباشر على هاتف السائق. افتح <b>الرابط الخاص بك</b> الذي أرسله المكتب عبر واتساب – اضغط على الرابط داخل الرسالة من هاتفك.</div>
+  </div>
   <div id="broken" class="bad hide">
-    <b>This link is incomplete.</b> Please ask the office to send you the setup link again.
-    <div class="ar">هذا الرابط غير مكتمل. اطلب من المكتب إرسال رابط الإعداد مرة أخرى.</div>
+    <b>This link is not complete – it may have been cut off.</b> Please ask the office to send the setup link again, and tap it directly inside the WhatsApp message.
+    <div class="ar">هذا الرابط غير مكتمل – ربما تم قطعه. اطلب من المكتب إرسال رابط الإعداد مرة أخرى، واضغط عليه مباشرة داخل رسالة واتساب.</div>
   </div>
 
   <div id="steps" class="hide">
@@ -79,14 +85,25 @@
   var ua = navigator.userAgent || '';
   var ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document);
   var android = /Android/i.test(ua);
-  // link format:  ...index.html#c=<base64url settings>&n=<truck name>   (the part after # never leaves the phone)
-  var p = {};
-  location.hash.replace(/^#/, '').split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
-  var b64 = (p.c || '').replace(/-/g, '+').replace(/_/g, '/');
-  while (b64.length % 4) b64 += '=';
-  var ok = false;
-  try { var cfg = JSON.parse(decodeURIComponent(escape(atob(b64)))); ok = cfg && cfg._type === 'configuration'; } catch (e) {}
-  if (!ok) { document.getElementById('broken').className = 'bad'; return; }
+  // Short link:  …/#u=<company code>&d=<tracking id>&t=<tracker id>&k=<secret key>&n=<truck name>[&h=<broker>&p=<port>&bu=<user>&bp=<pass>]
+  // Old long link: …/#c=<base64url settings>&n=<truck name>.   The part after # never leaves the phone.
+  var p = {}, hash = location.hash.replace(/^#/, '');
+  hash.split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) { try { p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); } catch (e) {} } });
+  if (!hash) { document.getElementById('plain').className = 'step'; return; }
+  var cfg = null;
+  if (p.c) {
+    var c64 = p.c.replace(/-/g, '+').replace(/_/g, '/'); while (c64.length % 4) c64 += '=';
+    try { cfg = JSON.parse(decodeURIComponent(escape(atob(c64)))); } catch (e) {}
+  } else if (/^[a-z0-9]{3,}$/.test(p.u || '') && /^[a-z0-9]{1,20}$/.test(p.d || '') && (p.k || '').length >= 12) {
+    // the same settings the office program builds (keep in sync with owntracksConfig in MazutDispatch.html)
+    cfg = {_type: 'configuration', mode: 0, host: p.h || 'broker.hivemq.com', port: +(p.p || 8883), tls: true, auth: !!p.bu,
+      username: p.bu || p.u, password: p.bp || '', deviceId: p.d, tid: (p.t || p.d.slice(0, 2)).toUpperCase().slice(0, 2),
+      clientId: p.u + '-' + p.d, pubTopicBase: 'owntracks/' + p.u + '/' + p.d, encryptionKey: p.k,
+      monitoring: 2, moveModeLocatorInterval: 30, locatorInterval: 60, locatorDisplacement: 50, pubRetain: true, pubQos: 1,
+      keepalive: 60, cleanSession: false, sub: false, cmd: false, remoteConfiguration: false};
+  }
+  if (!cfg || cfg._type !== 'configuration') { document.getElementById('broken').className = 'bad'; return; }
+  var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
   document.getElementById('steps').className = '';
   document.getElementById('who').textContent = p.n ? 'For: ' + p.n : '';
   var inline = encodeURIComponent(b64);
