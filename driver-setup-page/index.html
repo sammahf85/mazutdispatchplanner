@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Driver phone setup – live location</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:#f4f6f9;color:#1d2433;font-size:17px;line-height:1.45}
+  header{background:#1d2433;color:#fff;padding:18px 16px;text-align:center}
+  header h1{margin:0;font-size:21px} header p{margin:4px 0 0;color:#fdba74;font-weight:600}
+  main{max-width:520px;margin:0 auto;padding:14px}
+  .step{background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px #0001}
+  .step h2{margin:0 0 8px;font-size:18px;display:flex;gap:10px;align-items:center}
+  .n{flex:0 0 30px;height:30px;border-radius:50%;background:#c2410c;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .btn{display:block;text-align:center;text-decoration:none;font-weight:700;font-size:19px;padding:16px;border-radius:12px;margin:10px 0 4px;color:#fff;background:#1d2433}
+  .btn.go{background:#16a34a;font-size:21px;padding:20px}
+  .btn.alt{background:#fff;color:#1d2433;border:2px solid #cfd5e1;font-size:16px;padding:12px}
+  .ar{direction:rtl;text-align:right;color:#4b5563;font-size:16px;border-top:1px dashed #e2e6ee;margin-top:10px;padding-top:8px}
+  ul{margin:6px 0;padding-left:20px} .ar ul{padding-left:0;padding-right:20px}
+  .small{font-size:14px;color:#6b7385}
+  .bad{background:#fee2e2;border:1px solid #fca5a5;border-radius:12px;padding:14px}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<header><h1>📡 Live location setup</h1><p id="who"></p></header>
+<main>
+  <div id="broken" class="bad hide">
+    <b>This link is incomplete.</b> Please ask the office to send you the setup link again.
+    <div class="ar">هذا الرابط غير مكتمل. اطلب من المكتب إرسال رابط الإعداد مرة أخرى.</div>
+  </div>
+
+  <div id="steps" class="hide">
+    <div class="step">
+      <h2><span class="n">1</span> Install OwnTracks</h2>
+      <div>Install the free app <b>OwnTracks</b>. Already installed? Go to step 2.</div>
+      <a id="store" class="btn" href="#">⬇ Install OwnTracks</a>
+      <div class="ar">ثبّت تطبيق <b>OwnTracks</b> المجاني. إذا كان مثبّتاً، انتقل إلى الخطوة 2.</div>
+    </div>
+
+    <div class="step">
+      <h2><span class="n">2</span> Open OwnTracks with the company settings</h2>
+      <div>Tap the green button. OwnTracks opens and asks to import the settings – tap <b>Import / OK</b>.</div>
+      <a id="open" class="btn go" href="#">▶ Open in OwnTracks</a>
+      <div class="small" id="openHelp"></div>
+      <div class="ar">اضغط الزر الأخضر. سيفتح تطبيق OwnTracks ويطلب استيراد الإعدادات – اضغط <b>Import / OK</b>.</div>
+    </div>
+
+    <div class="step">
+      <h2><span class="n">3</span> Allow location "All the time"</h2>
+      <div id="perm"></div>
+      <div class="ar" id="permAr"></div>
+    </div>
+
+    <div class="step">
+      <h2><span class="n">4</span> Choose "Move" mode</h2>
+      <div>On the OwnTracks map screen tap the mode button at the top until it shows <b>Move</b>.
+        Keep the phone charging in the truck. Do not close OwnTracks from the recent apps list.</div>
+      <div class="ar">في شاشة الخريطة في OwnTracks اضغط زر الوضع في الأعلى حتى يظهر <b>Move</b>.
+        اترك الهاتف على الشاحن في الشاحنة، ولا تغلق التطبيق من قائمة التطبيقات الأخيرة.</div>
+    </div>
+
+    <div class="step">
+      <h2>✅ Done</h2>
+      <div>The office can now see your truck on the map during work. Thank you!</div>
+      <div class="ar">تم! يستطيع المكتب الآن رؤية الشاحنة على الخريطة أثناء العمل. شكراً لك!</div>
+      <a id="copy" class="btn alt" href="#">Didn't work? Copy the settings link</a>
+      <div class="small" id="copyMsg"></div>
+    </div>
+  </div>
+</main>
+<script>
+(function () {
+  var PLAY = 'https://play.google.com/store/apps/details?id=org.owntracks.android';
+  var APPSTORE = 'https://apps.apple.com/app/owntracks/id692424691';
+  var ua = navigator.userAgent || '';
+  var ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document);
+  var android = /Android/i.test(ua);
+  // link format:  ...index.html#c=<base64url settings>&n=<truck name>   (the part after # never leaves the phone)
+  var p = {};
+  location.hash.replace(/^#/, '').split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
+  var b64 = (p.c || '').replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  var ok = false;
+  try { var cfg = JSON.parse(decodeURIComponent(escape(atob(b64)))); ok = cfg && cfg._type === 'configuration'; } catch (e) {}
+  if (!ok) { document.getElementById('broken').className = 'bad'; return; }
+  document.getElementById('steps').className = '';
+  document.getElementById('who').textContent = p.n ? 'For: ' + p.n : '';
+  var inline = encodeURIComponent(b64);
+  var appLink = 'owntracks:///config?inline=' + inline;
+  // Android: an intent link opens OwnTracks if installed, otherwise the Play Store
+  var openLink = android ? 'intent:///config?inline=' + inline + '#Intent;scheme=owntracks;package=org.owntracks.android;S.browser_fallback_url=' + encodeURIComponent(PLAY) + ';end' : appLink;
+  document.getElementById('open').href = openLink;
+  var store = document.getElementById('store');
+  store.href = ios ? APPSTORE : PLAY;
+  store.textContent = ios ? '⬇ Install OwnTracks (App Store)' : android ? '⬇ Install OwnTracks (Google Play)' : '⬇ Install OwnTracks';
+  document.getElementById('openHelp').textContent = ios
+    ? 'If nothing happens: install OwnTracks first (step 1), open it once, then come back to this message and tap the green button again.'
+    : 'If the Play Store opens instead: install OwnTracks, open it once, then come back to this message and tap the green button again.';
+  document.getElementById('perm').innerHTML = ios
+    ? 'Open the iPhone <b>Settings</b> app → <b>OwnTracks</b> → <b>Location</b> → choose <b>Always</b>, and turn on <b>Precise Location</b> and <b>Background App Refresh</b>. Turn off Low Power Mode while working.'
+    : 'When asked, choose <b>Allow all the time</b>. Then: phone <b>Settings → Apps → OwnTracks → Battery → Unrestricted</b> (no battery saving), so it keeps working in the background.';
+  document.getElementById('permAr').innerHTML = ios
+    ? 'افتح <b>الإعدادات</b> في الآيفون ← <b>OwnTracks</b> ← <b>الموقع</b> ← اختر <b>دائماً</b>، وفعّل <b>الموقع الدقيق</b> و<b>تحديث التطبيقات في الخلفية</b>. أوقف وضع توفير الطاقة أثناء العمل.'
+    : 'عند السؤال اختر <b>السماح طوال الوقت</b>. ثم: <b>الإعدادات ← التطبيقات ← OwnTracks ← البطارية ← غير مقيّد</b> حتى يعمل في الخلفية.';
+  document.getElementById('copy').onclick = function (e) {
+    e.preventDefault();
+    var done = function () { document.getElementById('copyMsg').textContent = 'Copied. Paste it in the browser address bar (Safari / Chrome) and open it, or send it back to the office.'; };
+    if (navigator.clipboard) navigator.clipboard.writeText(appLink).then(done, function () { prompt('Copy this link:', appLink); });
+    else prompt('Copy this link:', appLink);
+  };
+})();
+</script>
+</body>
+</html>
