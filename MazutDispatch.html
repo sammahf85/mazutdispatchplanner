@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mazut Dispatch Planner</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{--bg:#f4f6f9;--panel:#fff;--ink:#1d2433;--muted:#6b7385;--line:#e2e6ee;--accent:#c2410c;--accent2:#9a3412;--ok:#15803d;--warn:#b45309;--bad:#b91c1c}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",system-ui,Arial,sans-serif;color:var(--ink);background:var(--bg);height:100vh;display:flex;flex-direction:column;font-size:14px}
+  header{background:#1d2433;color:#fff;display:flex;align-items:center;gap:14px;padding:8px 14px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:600}
+  header h1 span{color:#fb923c}
+  #company{color:#cbd2e0;font-size:13px}
+  nav{display:flex;gap:3px;margin-left:auto;flex-wrap:wrap}
+  nav button{background:transparent;color:#cbd2e0;border:0;padding:7px 11px;border-radius:6px;cursor:pointer;font-size:14px}
+  nav button.on{background:var(--accent);color:#fff}
+  main{flex:1;display:grid;grid-template-columns:540px 1fr;min-height:0}
+  #side{overflow:auto;padding:14px;border-right:1px solid var(--line);background:var(--panel)}
+  #mapWrap{position:relative}
+  #map{position:absolute;inset:0}
+  #pickBanner{display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:999;background:var(--accent);color:#fff;padding:8px 14px;border-radius:20px;box-shadow:0 2px 8px #0003}
+  #mapMsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);text-align:center;padding:30px}
+  .tab{display:none}.tab.on{display:block}
+  h2{font-size:16px;margin:4px 0 10px}
+  .card{border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px;background:#fff}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .grid .full{grid-column:1/-1}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+  input,select,textarea{width:100%;padding:7px 8px;border:1px solid #cfd5e1;border-radius:6px;font:inherit}
+  input[type=checkbox]{width:auto}
+  input.loc{border:2px dashed #25d366;background:#f0fdf4}
+  .row{display:flex;gap:6px;align-items:center}
+  .row>*{flex:1}
+  .row>.shrink{flex:0 0 auto}
+  button.b,a.b{background:#fff;border:1px solid #cfd5e1;padding:7px 12px;border-radius:6px;cursor:pointer;font:inherit;white-space:nowrap;color:inherit;text-decoration:none;display:inline-block}
+  button.b:hover,a.b:hover{background:#f1f3f7}
+  button.p{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.p:hover{background:var(--accent2)}
+  button.big{padding:10px 18px;font-size:15px;font-weight:600}
+  a.wa{background:#25d366;border-color:#25d366;color:#fff}
+  button.x{border:0;background:none;cursor:pointer;color:var(--muted);padding:2px 5px;font-size:14px}
+  button.x:hover{color:var(--bad)}
+  a.ml{text-decoration:none}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line);padding:5px 4px}
+  td{border-bottom:1px solid #eef1f5;padding:5px 4px;vertical-align:middle}
+  tr.off td{opacity:.45}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:10px;background:#eef1f5;color:var(--muted)}
+  .tag.u{background:#fee2e2;color:var(--bad)}
+  .tag.ok{background:#dcfce7;color:var(--ok)}
+  .tag.w{background:#fef3c7;color:var(--warn)}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+  .stat{background:#f7f8fb;border:1px solid var(--line);border-radius:8px;padding:8px}
+  .stat b{display:block;font-size:17px}
+  .stat small{color:var(--muted);font-size:11px}
+  .route{border-left:6px solid #999}
+  .route .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .bar{height:10px;background:#eef1f5;border-radius:5px;overflow:hidden;margin:8px 0}
+  .bar i{display:block;height:100%}
+  .muted{color:var(--muted)}
+  .hint{font-size:12px;color:var(--muted);margin:6px 0}
+  .locmsg{font-size:12px;margin-top:4px;min-height:16px}
+  .locmsg.ok{color:var(--ok)} .locmsg.bad{color:var(--bad)} .locmsg.w{color:var(--warn)}
+  .warnbox{background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px;margin-bottom:12px}
+  .badbox{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px;margin-bottom:12px}
+  .infobox{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px}
+  .actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+  #printArea{display:none}
+  @media print{
+    body{display:block;height:auto;background:#fff}
+    body>*:not(#printArea){display:none!important}
+    #printArea{display:block}
+    .sheet{page-break-after:always;padding:10px}
+    .sheet table td,.sheet table th{border:1px solid #999;padding:6px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>⛽ Mazut <span>Dispatch</span> Planner</h1>
+  <div id="company"></div>
+  <nav>
+    <button data-tab="requests" class="on">1. Orders</button>
+    <button data-tab="clients">2. Clients</button>
+    <button data-tab="trucks">3. Trucks</button>
+    <button data-tab="depots">4. Depots</button>
+    <button data-tab="plan">5. Trip Schedule</button>
+    <button data-tab="live">📡 Live Drivers</button>
+    <button data-tab="settings">⚙ Settings</button>
+  </nav>
+</header>
+
+<main>
+<section id="side">
+
+  <!-- ============ ORDERS ============ -->
+  <div class="tab on" id="tab-requests">
+    <div class="card" style="border:2px solid #16a34a;background:#f7fef9">
+      <h2>📥 Upload orders from Excel</h2>
+      <p class="hint" style="margin-top:0">One order per row: customer name and quantity (plus phone, address, location link, urgent… if you have them).
+        Saved customers are matched by name and their saved location is used. New customers are created automatically.</p>
+      <div class="actions">
+        <button class="b p" onclick="startUpload('orders')">⬆ Upload orders file</button>
+        <button class="b" onclick="downloadTemplate('orders')">⬇ Download orders template</button>
+      </div>
+      <div id="impBoxR"></div>
+    </div>
+    <div class="card">
+      <h2 id="reqFormTitle">New order</h2>
+      <div class="grid">
+        <div><label>Client name * (type to pick a saved client)</label><input id="rClient" list="clientList" oninput="fillFromClient()" autocomplete="off"></div>
+        <div><label>Phone</label><input id="rPhone"></div>
+        <div class="full"><label>📍 Location – paste the WhatsApp / Google Maps link the client sent, or "lat, lng"</label>
+          <div class="row"><input id="rLoc" class="loc" placeholder="e.g. https://maps.google.com/?q=33.98,35.61" oninput="onLocInput('r')">
+            </div>
+          <div class="actions" style="margin:5px 0 0"><button class="b" onclick="openGmaps('r')" title="Search the name / address in Google Maps">🌍 Find in Google Maps</button><button class="b" onclick="pasteLoc('r')">📋 Paste location</button><button class="b" onclick="pickFor('r')">📍 Pick on map</button></div>
+          <div id="rLocMsg" class="locmsg"></div></div>
+        <div class="full"><label>Delivery address (text for the driver)</label>
+          <div class="row"><input id="rAddress"><button class="b shrink" onclick="findAddress('r')" title="Search this address on the map">🔍 Find</button></div></div>
+        <div><label>Latitude *</label><input id="rLat" type="number" step="any" oninput="locManual('r')"></div>
+        <div><label>Longitude *</label><input id="rLng" type="number" step="any" oninput="locManual('r')"></div>
+        <div><label>Quantity ordered * (<span class="unit"></span>)</label><input id="rQty" type="number" min="0"></div>
+        <div><label>Priority</label><select id="rUrgent"><option value="0">Normal</option><option value="1">Urgent</option></select></div>
+        <div><label>Load from depot</label><select id="rDepot" class="depotSel auto"></select></div>
+        <div><label>Notes</label><input id="rNotes"></div>
+      </div>
+      <p class="hint">The client's location and address are saved in the <b>Clients</b> list automatically, so next time just type the name.</p>
+      <div class="actions">
+        <button class="b p" onclick="saveReq()">💾 Save order</button>
+        <button class="b" onclick="resetReqForm()">Clear form</button>
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:space-between">
+      <h2 style="flex:0;white-space:nowrap">Open orders</h2>
+      <div class="actions shrink" style="flex:0">
+        <button class="b" onclick="clearRequests()">🗑 Clear all</button>
+      </div>
+    </div>
+    <div id="reqSummary" class="hint"></div>
+    <table><thead><tr><th>Plan</th><th>Client</th><th class="num">Qty</th><th>Location</th><th></th></tr></thead><tbody id="reqBody"></tbody></table>
+  </div>
+
+  <!-- ============ CLIENTS ============ -->
+  <div class="tab" id="tab-clients">
+    <div class="card" style="border:2px solid #16a34a;background:#f7fef9">
+      <h2>📥 Upload customers from Excel</h2>
+      <p class="hint" style="margin-top:0">1. Download the template – or use your own sheet (any column names, English or Arabic).<br>
+        2. One customer per row: name, phone, address, and the WhatsApp / Google Maps location link if you have it.<br>
+        3. Upload it – you will see a preview, then the customers are created automatically.</p>
+      <div class="actions">
+        <button class="b p" onclick="startUpload('clients')">⬆ Upload Excel file</button>
+        <button class="b" onclick="downloadTemplate('clients')">⬇ Download Excel template</button>
+      </div>
+      <div id="impBoxC"></div>
+    </div>
+    <div class="card">
+      <h2 id="clientFormTitle">Add one client</h2>
+      <div class="grid">
+        <div><label>Client name *</label><input id="cName"></div>
+        <div><label>Phone / WhatsApp</label><input id="cPhone"></div>
+        <div class="full"><label>📍 Location – paste the WhatsApp / Google Maps link the client sent, or "lat, lng"</label>
+          <div class="row"><input id="cLoc" class="loc" placeholder="Paste the location link here" oninput="onLocInput('c')">
+            </div>
+          <div class="actions" style="margin:5px 0 0"><button class="b" onclick="openGmaps('c')" title="Search the name / address in Google Maps">🌍 Find in Google Maps</button><button class="b" onclick="pasteLoc('c')">📋 Paste location</button><button class="b" onclick="pickFor('c')">📍 Pick on map</button></div>
+          <div id="cLocMsg" class="locmsg"></div></div>
+        <div class="full"><label>Address (text for the driver)</label>
+          <div class="row"><input id="cAddress"><button class="b shrink" onclick="findAddress('c')">🔍 Find</button></div></div>
+        <div><label>Latitude</label><input id="cLat" type="number" step="any" oninput="locManual('c')"></div>
+        <div><label>Longitude</label><input id="cLng" type="number" step="any" oninput="locManual('c')"></div>
+        <div><label>Usually loaded from depot</label><select id="cDepot" class="depotSel auto"></select></div>
+        <div><label>Notes</label><input id="cNotes"></div>
+      </div>
+      <div class="actions">
+        <button class="b p" onclick="saveClient()">💾 Save client</button>
+        <button class="b" onclick="resetClientForm()">Clear form</button>
+      </div>
+    </div>
+    <div class="row" style="justify-content:space-between">
+      <h2 style="flex:0;white-space:nowrap">Clients</h2>
+      <div class="actions shrink" style="flex:0">
+        <button class="b" onclick="exportClients()">⬇ Export to Excel</button>
+      </div>
+    </div>
+    <input id="cSearch" placeholder="🔎 Search clients…" oninput="renderClients()" style="margin-bottom:8px">
+    <table><thead><tr><th>Client</th><th>Location</th><th></th></tr></thead><tbody id="clientBody"></tbody></table>
+    <p class="hint">The upload also accepts CSV, Google My Maps / Google Earth (.kml), GPS (.gpx), GeoJSON and Google Takeout "Saved Places" (.json).</p>
+  </div>
+  <input type="file" id="impFile" accept=".csv,.txt,.xlsx,.xls,.kml,.gpx,.geojson,.json,.kmz" hidden onchange="importFile(this)">
+  <datalist id="clientList"></datalist>
+
+  <!-- ============ TRUCKS ============ -->
+  <div class="tab" id="tab-trucks">
+    <div class="card">
+      <h2 id="truckFormTitle">Add tanker truck</h2>
+      <div class="grid">
+        <div><label>Truck name / No. *</label><input id="tName"></div>
+        <div><label>Plate number</label><input id="tPlate"></div>
+        <div><label>Driver</label><input id="tDriver"></div>
+        <div><label>Driver phone (WhatsApp)</label><input id="tPhone"></div>
+        <div><label>Tank capacity * (<span class="unit"></span>)</label><input id="tCap" type="number" min="0"></div>
+        <div><label>Home depot (loads here)</label><select id="tDepot" class="depotSel"></select></div>
+        <div><label>Tracking ID (for live location – auto)</label><input id="tTrack" placeholder="filled automatically, e.g. truck1"></div>
+        <div><label>Status</label><select id="tActive"><option value="1">Available</option><option value="0">Not available (maintenance / off)</option></select></div>
+      </div>
+      <div class="actions">
+        <button class="b p" onclick="saveTruck()">💾 Save truck</button>
+        <button class="b" onclick="resetTruckForm()">Clear form</button>
+      </div>
+    </div>
+    <h2>Fleet</h2>
+    <div id="truckSummary" class="hint"></div>
+    <table><thead><tr><th>Truck</th><th>Driver</th><th class="num">Capacity</th><th>Depot</th><th></th></tr></thead><tbody id="truckBody"></tbody></table>
+  </div>
+
+  <!-- ============ DEPOTS ============ -->
+  <div class="tab" id="tab-depots">
+    <div class="card">
+      <h2 id="depotFormTitle">Add depot</h2>
+      <div class="grid">
+        <div class="full"><label>Depot name *</label><input id="dName" placeholder="Type the depot name, then click &quot;Find in Google Maps&quot;"></div>
+        <div class="full"><label>📍 Location – paste a Google Maps link, or "lat, lng"</label>
+          <div class="row"><input id="dLoc" class="loc" oninput="onLocInput('d')"></div>
+          <div class="actions" style="margin:5px 0 0"><button class="b" onclick="openGmaps('d')" title="Search the name / address in Google Maps">🌍 Find in Google Maps</button><button class="b" onclick="pasteLoc('d')">📋 Paste location</button><button class="b" onclick="pickFor('d')">📍 Pick on map</button></div>
+          <div id="dLocMsg" class="locmsg"></div></div>
+        <div class="full"><label>Address</label>
+          <div class="row"><input id="dAddress"><button class="b shrink" onclick="findAddress('d')">🔍 Find</button></div></div>
+        <div><label>Latitude *</label><input id="dLat" type="number" step="any" oninput="locManual('d')"></div>
+        <div><label>Longitude *</label><input id="dLng" type="number" step="any" oninput="locManual('d')"></div>
+      </div>
+      <div class="actions">
+        <button class="b p" onclick="saveDepot()">💾 Save depot</button>
+        <button class="b" onclick="resetDepotForm()">Clear form</button>
+      </div>
+    </div>
+    <h2>Depots</h2>
+    <table><thead><tr><th>Depot</th><th>Trucks</th><th></th></tr></thead><tbody id="depotBody"></tbody></table>
+    <p class="hint">Each truck loads at and returns to its home depot. Each order is served from the client's chosen depot,
+      or automatically from the nearest depot. When a depot has no orders left, its free trucks help the other depots.</p>
+  </div>
+
+  <!-- ============ PLAN ============ -->
+  <div class="tab" id="tab-plan">
+    <div class="grid" style="grid-template-columns:1fr 1fr auto;align-items:end">
+      <div><label>Plan starts on</label><input id="pDate" type="date"></div>
+      <div><label>at time</label><input id="pTime" type="time"></div>
+      <button class="b" onclick="planNow()">Now</button>
+    </div>
+    <div class="actions">
+      <button class="b p big" onclick="runPlan()">⚡ Generate trip schedule</button>
+      <button class="b" onclick="printPlan()">🖨 Print all sheets</button>
+      <button class="b" onclick="exportPlanCSV()">⬇ Export Excel (CSV)</button>
+      <button class="b" onclick="clearCompleted()">🧹 Clear completed</button>
+    </div>
+    <p class="hint">If the orders are more than the trucks can carry at once, the planner schedules extra trips: whichever truck gets back
+      to its depot first takes the next load, so every driver's next trip is ready when they return.
+      Click <b>🚚 Start trip</b> when a truck leaves and <b>✅ Trip completed</b> when it is back – delivered quantities are taken off the orders.
+      New orders during the day? Add them and click <b>Generate</b> again (with <b>Now</b>) – completed trips and trucks on the road are kept.</p>
+    <div id="planOut"></div>
+  </div>
+
+  <!-- ============ LIVE DRIVERS ============ -->
+  <div class="tab" id="tab-live">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="flex:0;white-space:nowrap;margin:0">📡 Live driver locations</h2>
+        <div class="actions shrink" style="flex:0;margin:0">
+          <button class="b p" id="liveBtn" onclick="liveToggle()">Connect</button>
+          <button class="b" onclick="fitLive()">🗺 Show all</button>
+        </div>
+      </div>
+      <div id="liveStatus" class="hint"></div>
+      <table><thead><tr><th>Truck</th><th>Where / when</th><th>🔋</th><th></th></tr></thead><tbody id="liveBody"></tbody></table>
+      <p class="hint">Each driver's phone sends its GPS position with the free <b>OwnTracks</b> app (works in the background, screen off).
+        Click <b>📲 Set up phone</b> next to a truck once to connect that driver's phone.
+        Positions are <b>encrypted with your company's secret key</b> – only this program can read them.
+        Tell your drivers their phone location is shared during work.</p>
+    </div>
+    <div id="liveSetup"></div>
+    <details class="card">
+      <summary><b>⚙ Tracking connection settings</b> <span class="muted">(normally no need to change)</span></summary>
+      <div class="grid" style="margin-top:10px">
+        <div class="full"><label>Relay server (MQTT broker)</label><input id="lBroker"></div>
+        <div><label>Phone port (TLS)</label><input id="lTls" type="number"></div>
+        <div><label>Office port (WebSocket)</label><input id="lWs" type="number"></div>
+        <div><label>Company code (keep the same on all phones)</label><input id="lCode"></div>
+        <div><label>Secret key (keep it private)</label><input id="lKey"></div>
+        <div><label>Broker username (optional)</label><input id="lUser"></div>
+        <div><label>Broker password (optional)</label><input id="lPass" type="password"></div>
+        <div class="full"><label>Driver setup page address (https://…)</label><input id="lSetupUrl" placeholder="set up from 📲 Set up phone"></div>
+      </div>
+      <p class="hint">Uses the free public HiveMQ relay by default. For a private relay, create a free broker (e.g. HiveMQ Cloud) and enter it here with its username/password.
+        After changing the code, key or server, set up the phones again.</p>
+      <div class="actions"><button class="b p" onclick="saveLiveSettings()">💾 Save</button><button class="b" onclick="newLiveKey()">🔄 New secret key</button></div>
+    </details>
+  </div>
+
+  <!-- ============ SETTINGS ============ -->
+  <div class="tab" id="tab-settings">
+    <div class="card">
+      <h2>Company</h2>
+      <div class="grid">
+        <div><label>Company name</label><input id="sCompany"></div>
+        <div><label>Quantity unit</label><select id="sUnit"><option>L</option><option>m³</option><option>tons</option><option>gal</option></select></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Planning rules</h2>
+      <div class="grid">
+        <div><label>Cluster radius (km) — max distance between clients on the same truck</label><input id="sRadius" type="number" min="1"></div>
+        <div><label>Road factor (road km ÷ straight-line km)</label><input id="sRoad" type="number" step="0.05" min="1"></div>
+        <div><label>Allow splitting an order between trucks</label><select id="sSplit"><option value="1">Yes</option><option value="0">Only if bigger than the largest truck</option></select></div>
+        <div><label>Minimum split quantity (<span class="unit"></span>)</label><input id="sMinSplit" type="number" min="0"></div>
+        <div><label>Max trips per truck per day (0 = no limit)</label><input id="sTrips" type="number" min="0" max="20"></div>
+        <div><label>Loading time at depot per trip (min)</label><input id="sLoadMin" type="number" min="0"></div>
+        <div><label>Working day starts</label><input id="sDayStart" type="time"></div>
+        <div><label>Working day ends</label><input id="sDayEnd" type="time"></div>
+        <div><label>If orders don't fit in one day</label><select id="sMultiDay"><option value="1">Continue next working day</option><option value="0">Today only (show what's left)</option></select></div>
+        <div><label>Average speed (km/h)</label><input id="sSpeed" type="number" min="5"></div>
+        <div><label>Unloading time per stop (min)</label><input id="sService" type="number" min="0"></div>
+      </div>
+      <div class="actions"><button class="b p" onclick="saveSettings()">💾 Save settings</button></div>
+    </div>
+    <div class="card">
+      <h2>Data</h2>
+      <p class="hint">Data is saved automatically on this computer (inside this browser). Use backups to move data to another PC.</p>
+      <div class="actions">
+        <button class="b" onclick="backup()">⬇ Save backup file</button>
+        <button class="b" onclick="$('#bkFile').click()">⬆ Restore backup</button>
+        <button class="b" onclick="loadDemo()">🧪 Load demo data</button>
+        <button class="b" onclick="resetAll()">⚠ Erase everything</button>
+      </div>
+      <input type="file" id="bkFile" accept=".json" hidden onchange="restore(this)">
+    </div>
+  </div>
+</section>
+
+<section id="mapWrap">
+  <div id="mapMsg">Map needs an internet connection.<br>Planning still works offline if you paste or type coordinates.</div>
+  <div id="map"></div>
+  <div id="pickBanner">Click on the map to set the location — <a href="#" style="color:#fff" onclick="cancelPick();return false">cancel</a></div>
+</section>
+</main>
+
+<script type="text/plain" id="setupPageTpl">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Driver phone setup – live location</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:#f4f6f9;color:#1d2433;font-size:17px;line-height:1.45}
+  header{background:#1d2433;color:#fff;padding:18px 16px;text-align:center}
+  header h1{margin:0;font-size:21px} header p{margin:4px 0 0;color:#fdba74;font-weight:600}
+  main{max-width:520px;margin:0 auto;padding:14px}
+  .step{background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px #0001}
+  .step h2{margin:0 0 8px;font-size:18px;display:flex;gap:10px;align-items:center}
+  .n{flex:0 0 30px;height:30px;border-radius:50%;background:#c2410c;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .btn{display:block;text-align:center;text-decoration:none;font-weight:700;font-size:19px;padding:16px;border-radius:12px;margin:10px 0 4px;color:#fff;background:#1d2433}
+  .btn.go{background:#16a34a;font-size:21px;padding:20px}
+  .btn.alt{background:#fff;color:#1d2433;border:2px solid #cfd5e1;font-size:16px;padding:12px}
+  .ar{direction:rtl;text-align:right;color:#4b5563;font-size:16px;border-top:1px dashed #e2e6ee;margin-top:10px;padding-top:8px}
+  ul{margin:6px 0;padding-left:20px} .ar ul{padding-left:0;padding-right:20px}
+  .small{font-size:14px;color:#6b7385}
+  .bad{background:#fee2e2;border:1px solid #fca5a5;border-radius:12px;padding:14px}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<header><h1>📡 Live location setup</h1><p id="who"></p></header>
+<main>
+  <div id="broken" class="bad hide">
+    <b>This link is incomplete.</b> Please ask the office to send you the setup link again.
+    <div class="ar">هذا الرابط غير مكتمل. اطلب من المكتب إرسال رابط الإعداد مرة أخرى.</div>
+  </div>
+
+  <div id="steps" class="hide">
+    <div class="step">
+      <h2><span class="n">1</span> Install OwnTracks</h2>
+      <div>Install the free app <b>OwnTracks</b>. Already installed? Go to step 2.</div>
+      <a id="store" class="btn" href="#">⬇ Install OwnTracks</a>
+      <div class="ar">ثبّت تطبيق <b>OwnTracks</b> المجاني. إذا كان مثبّتاً، انتقل إلى الخطوة 2.</div>
+    </div>
+
+    <div class="step">
+      <h2><span class="n">2</span> Open OwnTracks with the company settings</h2>
+      <div>Tap the green button. OwnTracks opens and asks to import the settings – tap <b>Import / OK</b>.</div>
+      <a id="open" class="btn go" href="#">▶ Open in OwnTracks</a>
+      <div class="small" id="openHelp"></div>
+      <div class="ar">اضغط الزر الأخضر. سيفتح تطبيق OwnTracks ويطلب استيراد الإعدادات – اضغط <b>Import / OK</b>.</div>
+    </div>
+
+    <div class="step">
+      <h2><span class="n">3</span> Allow location "All the time"</h2>
+      <div id="perm"></div>
+      <div class="ar" id="permAr"></div>
+    </div>
+
+    <div class="step">
+      <h2><span class="n">4</span> Choose "Move" mode</h2>
+      <div>On the OwnTracks map screen tap the mode button at the top until it shows <b>Move</b>.
+        Keep the phone charging in the truck. Do not close OwnTracks from the recent apps list.</div>
+      <div class="ar">في شاشة الخريطة في OwnTracks اضغط زر الوضع في الأعلى حتى يظهر <b>Move</b>.
+        اترك الهاتف على الشاحن في الشاحنة، ولا تغلق التطبيق من قائمة التطبيقات الأخيرة.</div>
+    </div>
+
+    <div class="step">
+      <h2>✅ Done</h2>
+      <div>The office can now see your truck on the map during work. Thank you!</div>
+      <div class="ar">تم! يستطيع المكتب الآن رؤية الشاحنة على الخريطة أثناء العمل. شكراً لك!</div>
+      <a id="copy" class="btn alt" href="#">Didn't work? Copy the settings link</a>
+      <div class="small" id="copyMsg"></div>
+    </div>
+  </div>
+</main>
+<script>
+(function () {
+  var PLAY = 'https://play.google.com/store/apps/details?id=org.owntracks.android';
+  var APPSTORE = 'https://apps.apple.com/app/owntracks/id692424691';
+  var ua = navigator.userAgent || '';
+  var ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document);
+  var android = /Android/i.test(ua);
+  // link format:  ...index.html#c=<base64url settings>&n=<truck name>   (the part after # never leaves the phone)
+  var p = {};
+  location.hash.replace(/^#/, '').split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
+  var b64 = (p.c || '').replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  var ok = false;
+  try { var cfg = JSON.parse(decodeURIComponent(escape(atob(b64)))); ok = cfg && cfg._type === 'configuration'; } catch (e) {}
+  if (!ok) { document.getElementById('broken').className = 'bad'; return; }
+  document.getElementById('steps').className = '';
+  document.getElementById('who').textContent = p.n ? 'For: ' + p.n : '';
+  var inline = encodeURIComponent(b64);
+  var appLink = 'owntracks:///config?inline=' + inline;
+  // Android: an intent link opens OwnTracks if installed, otherwise the Play Store
+  var openLink = android ? 'intent:///config?inline=' + inline + '#Intent;scheme=owntracks;package=org.owntracks.android;S.browser_fallback_url=' + encodeURIComponent(PLAY) + ';end' : appLink;
+  document.getElementById('open').href = openLink;
+  var store = document.getElementById('store');
+  store.href = ios ? APPSTORE : PLAY;
+  store.textContent = ios ? '⬇ Install OwnTracks (App Store)' : android ? '⬇ Install OwnTracks (Google Play)' : '⬇ Install OwnTracks';
+  document.getElementById('openHelp').textContent = ios
+    ? 'If nothing happens: install OwnTracks first (step 1), open it once, then come back to this message and tap the green button again.'
+    : 'If the Play Store opens instead: install OwnTracks, open it once, then come back to this message and tap the green button again.';
+  document.getElementById('perm').innerHTML = ios
+    ? 'Open the iPhone <b>Settings</b> app → <b>OwnTracks</b> → <b>Location</b> → choose <b>Always</b>, and turn on <b>Precise Location</b> and <b>Background App Refresh</b>. Turn off Low Power Mode while working.'
+    : 'When asked, choose <b>Allow all the time</b>. Then: phone <b>Settings → Apps → OwnTracks → Battery → Unrestricted</b> (no battery saving), so it keeps working in the background.';
+  document.getElementById('permAr').innerHTML = ios
+    ? 'افتح <b>الإعدادات</b> في الآيفون ← <b>OwnTracks</b> ← <b>الموقع</b> ← اختر <b>دائماً</b>، وفعّل <b>الموقع الدقيق</b> و<b>تحديث التطبيقات في الخلفية</b>. أوقف وضع توفير الطاقة أثناء العمل.'
+    : 'عند السؤال اختر <b>السماح طوال الوقت</b>. ثم: <b>الإعدادات ← التطبيقات ← OwnTracks ← البطارية ← غير مقيّد</b> حتى يعمل في الخلفية.';
+  document.getElementById('copy').onclick = function (e) {
+    e.preventDefault();
+    var done = function () { document.getElementById('copyMsg').textContent = 'Copied. Paste it in the browser address bar (Safari / Chrome) and open it, or send it back to the office.'; };
+    if (navigator.clipboard) navigator.clipboard.writeText(appLink).then(done, function () { prompt('Copy this link:', appLink); });
+    else prompt('Copy this link:', appLink);
+  };
+})();
+<\/script>
+</body>
+</html>
+
+</script>
+<div id="printArea"></div>
+
+<script>
+/* ===================== helpers ===================== */
+const $ = s => document.querySelector(s);
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => (Math.round(n * 100) / 100).toLocaleString();
+const EPS = 1e-6;
+const COLORS = ['#e6194b','#3cb44b','#4363d8','#f58231','#911eb4','#0f9ea8','#f032e6','#808000','#9a6324','#000075','#800000','#469990','#bfa300','#5b5b5b'];
+function hav(a, b) {
+  const R = 6371, r = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+}
+const roadKm = (a, b) => hav(a, b) * S.settings.roadFactor;
+const numOrNull = v => (v === '' || v == null || isNaN(+v)) ? null : +v;
+const hm = s => { const [h, m] = String(s || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+const pad = n => String(n).padStart(2, '0');
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const fmtTime = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const fmtDay = ms => new Date(ms).toLocaleDateString(undefined, {weekday: 'short', day: 'numeric', month: 'short'});
+const fmtWhen = ms => `${fmtDay(ms)} ${fmtTime(ms)}`;
+const gmaps = (lat, lng) => `https://www.google.com/maps?q=${lat},${lng}`;
+const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type}));
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function loadScript(src) {
+  return new Promise((ok, fail) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => fail(new Error('Could not load ' + src + ' (internet needed).')); document.head.appendChild(s); });
+}
+
+/* ---------- read a location from a WhatsApp / Google Maps link, coordinates or DMS ---------- */
+const isShortLink = t => /(maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs|share\.google)/i.test(t || '');
+function parseLocation(raw) {
+  if (!raw) return null;
+  let t = String(raw).trim();
+  try { t = decodeURIComponent(t.replace(/\+/g, ' ')); } catch (e) {}
+  const ok = (a, b) => { const lat = +a, lng = +b;
+    return (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0)) ? {lat, lng} : null; };
+  const N = '(-?\\d{1,3}(?:\\.\\d+)?)';
+  const pats = [
+    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,                                                           // exact pin of a Google place
+    new RegExp(`[?&](?:q|query|ll|sll|destination|daddr|center|coordinates)=(?:loc:)?\\s*${N}\\s*,\\s*${N}`, 'i'), // ?q=lat,lng (WhatsApp)
+    /@(-?\d+\.\d+),\s*(-?\d+\.\d+)/,                                                             // …/@lat,lng,17z
+    /geo:(-?\d+\.\d+),(-?\d+\.\d+)/i,                                                            // geo:lat,lng
+    /\/maps\/(?:search|place|dir)\/(?:[^/]*\/)?\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)/i                 // /maps/search/lat,lng
+  ];
+  for (const p of pats) { const m = t.match(p); if (m) { const c = ok(m[1], m[2]); if (c) return c; } }
+  const dms = t.match(/(\d{1,3})°\s*(\d{1,2})['′]\s*([\d.]+)\s*(?:"|″|'')?\s*([NS])[\s,]+(\d{1,3})°\s*(\d{1,2})['′]\s*([\d.]+)\s*(?:"|″|'')?\s*([EW])/i);
+  if (dms) {
+    const v = (d, m, s, h) => (+d + +m / 60 + +s / 3600) * (/[SW]/i.test(h) ? -1 : 1);
+    const c = ok(v(dms[1], dms[2], dms[3], dms[4]), v(dms[5], dms[6], dms[7], dms[8])); if (c) return c;
+  }
+  if (/https?:\/\//i.test(t) && !/map|geo:/i.test(t)) return null;
+  const m = t.match(/(-?\d{1,2}\.\d{3,})\s*[,;\s]\s*(-?\d{1,3}\.\d{3,})/);
+  return m ? ok(m[1], m[2]) : null;
+}
+async function geocode(q) {
+  const c = parseLocation(q); if (c) return c;
+  // Esri World Geocoder: free for searches, no API key, works from a local file
+  let url = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&maxLocations=1&SingleLine=' + encodeURIComponent(q);
+  const near = S.depots[0];
+  if (near) url += `&location=${near.lng},${near.lat}`;
+  const j = await (await fetch(url)).json();
+  const hit = j.candidates && j.candidates[0];
+  if (!hit) throw new Error('Address not found. Try a simpler address (area + city), paste a Google Maps link, or pick the point on the map.');
+  return {lat: hit.location.y, lng: hit.location.x};
+}
+
+/* ===================== state ===================== */
+const KEY = 'mazutDispatchPlanner.v1';
+const DEFAULTS = {settings:{company:'', unit:'L', roadFactor:1.3, maxRadius:30, allowSplit:true, minSplit:500, maxTrips:0, speed:35,
+  serviceMin:20, loadMin:30, dayStart:'07:00', dayEnd:'17:00', multiDay:true}, depots:[], clients:[], trucks:[], requests:[], plan:null};
+function migrate(d) {
+  d.settings ||= {};
+  if (d.settings.dayStart === undefined) d.settings.maxTrips = 0;
+  d.depots ||= [];
+  if (d.settings.depot && !d.depots.length)
+    d.depots.push({id: uid(), name: d.settings.depotName || 'Main depot', address: d.settings.depotName || '', lat: d.settings.depot.lat, lng: d.settings.depot.lng});
+  delete d.settings.depot; delete d.settings.depotName;
+  d.requests ||= []; d.trucks ||= [];
+  if (!d.clients) {
+    d.clients = [];
+    d.requests.forEach(r => {
+      let c = d.clients.find(x => sameName(x.name, r.client));
+      if (!c) d.clients.push(c = {id: uid(), name: r.client, phone: r.phone || '', address: r.address || '', lat: r.lat, lng: r.lng, notes: '', depotId: ''});
+      r.clientId = c.id;
+    });
+  }
+  if (d.plan) {
+    if (!d.plan.routes || d.plan.routes.some(r => !r.status)) d.plan = null;
+    else d.plan.routes.forEach(r => { if (r.dLat === undefined && d.depots[0]) Object.assign(r, {depotId: d.depots[0].id, depotName: d.depots[0].name, dLat: d.depots[0].lat, dLng: d.depots[0].lng}); });
+  }
+  return {...structuredClone(DEFAULTS), ...d, settings: {...DEFAULTS.settings, ...d.settings}};
+}
+function loadState() {
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d) return migrate(d); } catch (e) {}
+  return structuredClone(DEFAULTS);
+}
+let S = loadState();
+function save() { localStorage.setItem(KEY, JSON.stringify(S)); }
+const depotById = id => S.depots.find(d => d.id === id);
+const truckDepot = t => depotById(t.depotId) || S.depots[0];
+
+/* ===================== tabs ===================== */
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+function showTab(t) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('.tab').forEach(d => d.classList.toggle('on', d.id === 'tab-' + t));
+}
+
+/* ===================== map ===================== */
+let map = null, layer = null, pickTarget = null, preview = null;
+if (window.L) {
+  $('#mapMsg').style.display = 'none';
+  map = L.map('map').setView([33.9, 35.6], 8);
+  // Map tiles that work without an API key when the app is opened as a local file.
+  // (OpenStreetMap's own server answers "Access blocked" and CARTO answers "API key required" in that case.)
+  const esriUrl = n => `https://server.arcgisonline.com/ArcGIS/rest/services/${n}/MapServer/tile/{z}/{y}/{x}`;
+  const bases = {
+    'Street map': L.tileLayer(esriUrl('World_Street_Map'), {maxZoom: 19, attribution: 'Tiles © Esri'}),
+    'Satellite': L.tileLayer(esriUrl('World_Imagery'), {maxZoom: 19, attribution: 'Tiles © Esri'}),
+    'Topographic': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {maxZoom: 17, attribution: '© OpenStreetMap contributors, © OpenTopoMap'})
+  };
+  const savedBase = localStorage.getItem(KEY + '.basemap');
+  (bases[savedBase] || bases['Street map']).addTo(map);
+  L.control.layers(bases, null, {position: 'topright'}).addTo(map);
+  map.on('baselayerchange', e => localStorage.setItem(KEY + '.basemap', e.name));
+  layer = L.layerGroup().addTo(map);
+  map.on('click', e => {
+    if (!pickTarget) return;
+    const p = pickTarget; cancelPick();
+    setLoc(p, {lat: e.latlng.lat, lng: e.latlng.lng}, '✓ Location set from the map');
+  });
+}
+function pickFor(p) {
+  if (!map) return alert('Map is not available (no internet). Paste a location link or type latitude/longitude.');
+  pickTarget = p; $('#pickBanner').style.display = 'block'; $('#map').style.cursor = 'crosshair';
+}
+function cancelPick() { pickTarget = null; $('#pickBanner').style.display = 'none'; $('#map').style.cursor = ''; }
+function showPreview(c) {
+  if (!map) return;
+  if (preview) map.removeLayer(preview);
+  preview = c ? L.circleMarker([c.lat, c.lng], {radius: 11, color: '#25d366', weight: 4, fillOpacity: .3}).addTo(map) : null;
+  if (c) map.setView([c.lat, c.lng], Math.max(map.getZoom(), 14));
+}
+function pinIcon(color, text) {
+  return L.divIcon({className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+    html: `<div style="width:26px;height:26px;border-radius:50%;background:${color};color:#fff;border:2px solid #fff;box-shadow:0 1px 4px #0006;display:flex;align-items:center;justify-content:center;font:600 11px Segoe UI">${text}</div>`});
+}
+function drawMap(fit) {
+  if (!map) return;
+  layer.clearLayers();
+  const pts = [];
+  S.depots.forEach(d => {
+    L.marker([d.lat, d.lng], {icon: L.divIcon({className: '', iconSize: [34, 34], iconAnchor: [17, 17],
+      html: '<div style="width:34px;height:34px;border-radius:6px;background:#1d2433;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;border:2px solid #fb923c">⛽</div>'})})
+      .bindPopup(`<b>${esc(d.name)}</b><br>${esc(d.address)}<br>${S.trucks.filter(t => truckDepot(t) === d).length} trucks`).addTo(layer);
+    pts.push([d.lat, d.lng]);
+  });
+  const served = {};
+  // open trips: one colour per truck; solid line = next trip / on the road, dashed = later trips
+  if (S.plan) S.plan.routes.filter(r => r.status !== 'done').forEach(r => {
+    const color = truckColor(r.truckId), nx = nextTripOf(r.truckId), isNext = nx && nx.id === r.id;
+    const line = [[r.dLat, r.dLng], ...r.stops.map(s => [s.lat, s.lng]), [r.dLat, r.dLng]];
+    L.polyline(line, {color, weight: isNext ? 5 : 3, opacity: isNext ? .9 : .6, dashArray: isNext ? null : '8 6'})
+      .bindPopup(`<b>${esc(r.truckName)}</b> – trip ${r.tripNo}<br>${esc(r.depotName)}<br>${fmtWhen(r.depart)} → ${fmtTime(r.ret)}<br>${fmt(r.load)} / ${fmt(r.cap)} ${S.settings.unit}`).addTo(layer);
+    r.stops.forEach((s, k) => (served[s.reqId] ||= []).push({color, k: k + 1, truck: `${r.truckName} trip ${r.tripNo}`, qty: s.qty}));
+  });
+  S.requests.forEach(q => {
+    if (q.lat == null) return;
+    const sv = served[q.id];
+    const color = sv ? sv[0].color : (q.active === false ? '#aaa' : '#555');
+    let pop = `<b>${esc(q.client)}</b><br>${esc(q.address)}<br>Ordered: ${fmt(q.qty)} ${S.settings.unit}<br><a href="${gmaps(q.lat, q.lng)}" target="_blank">Open in Google Maps</a>`;
+    if (sv) pop += '<br>' + sv.map(x => `→ ${esc(x.truck)}: ${fmt(x.qty)}`).join('<br>');
+    L.marker([q.lat, q.lng], {icon: pinIcon(color, sv ? sv[0].k : '')}).bindPopup(pop).addTo(layer);
+    pts.push([q.lat, q.lng]);
+  });
+  if (fit && pts.length) map.fitBounds(pts, {padding: [40, 40], maxZoom: 13});
+}
+
+/* ===================== location inputs (prefix r = order, c = client, d = depot) ===================== */
+function locMsg(p, html, cls) { const e = $('#' + p + 'LocMsg'); e.innerHTML = html; e.className = 'locmsg ' + (cls || ''); }
+function setLoc(p, c, msg) {
+  $('#' + p + 'Lat').value = c.lat.toFixed(6); $('#' + p + 'Lng').value = c.lng.toFixed(6);
+  locMsg(p, `${msg || '✓ Location read'}: ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)} &nbsp;<a href="${gmaps(c.lat, c.lng)}" target="_blank">check in Google Maps</a>`, 'ok');
+  showPreview(c);
+}
+function onLocInput(p) {
+  const t = $('#' + p + 'Loc').value.trim();
+  if (!t) return locMsg(p, '');
+  const c = parseLocation(t);
+  if (c) {
+    const pm = t.match(/\/maps\/place\/([^/@?]+)/);   // Google place link → use the place name as address if empty
+    if (pm && !$('#' + p + 'Address').value.trim()) { try { $('#' + p + 'Address').value = decodeURIComponent(pm[1].replace(/\+/g, ' ')); } catch (e) {} }
+    return setLoc(p, c, '✓ Location read from the link');
+  }
+  if (isShortLink(t)) {
+    const url = (t.match(/https?:\/\/\S+/) || [t])[0];
+    return locMsg(p, `This is a short Google Maps link. <a href="#" onclick="window.open('${esc(url).replace(/'/g, '%27')}','_blank');return false"><b>Open it</b></a> –
+      when Google Maps opens, copy the full address from the browser's address bar and paste it here.`, 'w');
+  }
+  locMsg(p, 'No location found in this text. Paste the Google Maps link or "lat, lng".', 'bad');
+}
+function locManual(p) {
+  const lat = numOrNull($('#' + p + 'Lat').value), lng = numOrNull($('#' + p + 'Lng').value);
+  if (lat != null && lng != null) showPreview({lat, lng});
+}
+async function findAddress(p) {
+  const q = $('#' + p + 'Address').value.trim(); if (!q) return alert('Type an address first.');
+  try { setLoc(p, await geocode(q), '✓ Address found – check the green circle on the map'); }
+  catch (e) { alert(e.message || 'Address search failed (internet needed).'); }
+}
+/* ---------- find the place in Google Maps, then bring the location back ---------- */
+const NAME_FIELD = {r: 'rClient', c: 'cName', d: 'dName'};
+function openGmaps(p) {
+  const name = $('#' + NAME_FIELD[p]).value.trim(), addr = $('#' + p + 'Address').value.trim();
+  const lat = numOrNull($('#' + p + 'Lat').value), lng = numOrNull($('#' + p + 'Lng').value);
+  const q = [name, addr].filter(Boolean).join(', ');
+  if (!q && lat == null) return alert('Type the name (or address) first, then click "Find in Google Maps".');
+  window.open(q ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q) : gmaps(lat, lng), '_blank');
+  locMsg(p, `<b>Google Maps is open in your browser.</b> Find the exact place, then copy its location:<br>
+    • <b>right-click</b> the exact spot → click the <b>numbers</b> at the top of the menu (they are copied), or<br>
+    • click the place → <b>Share → Copy link</b>, or copy the link from the address bar.<br>
+    Then come back here and click <b>📋 Paste location</b>.`, 'w');
+  window.addEventListener('focus', () => setTimeout(() => autoPaste(p), 300), {once: true});
+}
+async function autoPaste(p) {   // when you come back from Google Maps, take the copied location automatically
+  try {
+    const t = (await navigator.clipboard.readText()).trim();
+    if (t && (parseLocation(t) || isShortLink(t)) && t !== $('#' + p + 'Loc').value.trim()) { $('#' + p + 'Loc').value = t; onLocInput(p); }
+  } catch (e) {}
+}
+async function pasteLoc(p) {
+  try {
+    const t = (await navigator.clipboard.readText()).trim();
+    if (!t) throw 0;
+    $('#' + p + 'Loc').value = t; onLocInput(p);
+  } catch (e) { $('#' + p + 'Loc').focus(); locMsg(p, 'Click in the green box and press <b>Ctrl + V</b> to paste.', 'w'); }
+}
+function clearLoc(p) { ['Loc', 'Lat', 'Lng'].forEach(k => $('#' + p + k).value = ''); locMsg(p, ''); showPreview(null); }
+function getLoc(p) {
+  let lat = numOrNull($('#' + p + 'Lat').value), lng = numOrNull($('#' + p + 'Lng').value);
+  if (lat == null || lng == null) { const c = parseLocation($('#' + p + 'Loc').value) || parseLocation($('#' + p + 'Address').value); if (c) ({lat, lng} = c); }
+  return {lat, lng};
+}
+function fillDepotSelects() {
+  document.querySelectorAll('.depotSel').forEach(sel => {
+    const v = sel.value;
+    sel.innerHTML = (sel.classList.contains('auto') ? '<option value="">Auto – nearest depot</option>' : '') +
+      S.depots.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+    if ([...sel.options].some(o => o.value === v)) sel.value = v;
+  });
+  $('#clientList').innerHTML = S.clients.map(c => `<option value="${esc(c.name)}">`).join('');
+}
+
+/* ===================== clients (address book) ===================== */
+let editClient = null;
+function upsertClient(c) {   // match by id, then by name; returns the client id
+  const byId = c.id && S.clients.find(k => k.id === c.id);
+  let x = byId || S.clients.find(k => sameName(k.name, c.name));
+  if (!x) { x = {id: uid(), name: c.name, phone: '', address: '', lat: null, lng: null, notes: '', depotId: ''}; S.clients.push(x); }
+  // matched by name → keep the saved spelling of the name
+  [...(byId ? ['name'] : []), 'phone', 'address', 'notes', 'depotId'].forEach(k => { if (c[k] !== undefined && c[k] !== '') x[k] = c[k]; });
+  if (c.lat != null && c.lng != null) { x.lat = c.lat; x.lng = c.lng; }
+  return x.id;
+}
+function resetClientForm() {
+  editClient = null; $('#clientFormTitle').textContent = 'Add client';
+  ['cName', 'cPhone', 'cAddress', 'cNotes'].forEach(id => $('#' + id).value = ''); $('#cDepot').value = ''; clearLoc('c');
+}
+function saveClient() {
+  const name = $('#cName').value.trim(); if (!name) return alert('Client name is required.');
+  const dupe = S.clients.find(k => sameName(k.name, name) && k.id !== editClient);
+  if (dupe) return alert('A client with this name already exists.');
+  const loc = getLoc('c');
+  const c = {name, phone: $('#cPhone').value.trim(), address: $('#cAddress').value.trim(), notes: $('#cNotes').value.trim(), depotId: $('#cDepot').value, ...loc};
+  if (editClient) {
+    Object.assign(S.clients.find(k => k.id === editClient), c);
+    S.requests.filter(r => r.clientId === editClient).forEach(r => Object.assign(r, {client: c.name, phone: c.phone, address: c.address, lat: c.lat, lng: c.lng}));
+  } else S.clients.push({id: uid(), ...c});
+  save(); resetClientForm(); renderAll();
+}
+function editClientFn(id) {
+  const c = S.clients.find(k => k.id === id); editClient = id; showTab('clients');
+  $('#clientFormTitle').textContent = 'Edit client – ' + c.name;
+  $('#cName').value = c.name; $('#cPhone').value = c.phone || ''; $('#cAddress').value = c.address || ''; $('#cNotes').value = c.notes || '';
+  $('#cDepot').value = c.depotId || ''; $('#cLoc').value = ''; $('#cLat').value = c.lat ?? ''; $('#cLng').value = c.lng ?? '';
+  locMsg('c', c.lat != null ? `Saved location: ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)} – paste a new link to change it` : 'No location yet – paste the link the client sent', c.lat != null ? 'ok' : 'w');
+  if (c.lat != null) showPreview(c);
+  $('#side').scrollTop = 0;
+}
+function delClient(id) {
+  if (!confirm('Delete this client from the list? (Their open orders stay.)')) return;
+  S.clients = S.clients.filter(k => k.id !== id); save(); renderAll();
+}
+function orderFor(id) {
+  const c = S.clients.find(k => k.id === id); showTab('requests'); resetReqForm();
+  $('#rClient').value = c.name; fillFromClient(); $('#rQty').focus();
+}
+function renderClients() {
+  const q = ($('#cSearch').value || '').trim().toLowerCase();
+  const list = S.clients.filter(c => !q || [c.name, c.phone, c.address].some(v => String(v || '').toLowerCase().includes(q)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  $('#clientBody').innerHTML = list.map(c => `<tr>
+    <td><b>${esc(c.name)}</b> ${c.phone ? `<span class="muted">· ${esc(c.phone)}</span>` : ''}<br><span class="muted">${esc(c.address)}${depotById(c.depotId) ? ' · ⛽ ' + esc(depotById(c.depotId).name) : ''}</span></td>
+    <td>${c.lat != null ? `<a class="ml tag ok" href="${gmaps(c.lat, c.lng)}" target="_blank" title="Open in Google Maps">🗺 on map</a>` : '<span class="tag w">missing</span>'}</td>
+    <td class="num" style="white-space:nowrap"><button class="b" onclick="orderFor('${c.id}')">➕ Order</button>
+      <button class="x" title="Edit" onclick="editClientFn('${c.id}')">✏️</button><button class="x" title="Delete" onclick="delClient('${c.id}')">✖</button></td></tr>`).join('')
+    || `<tr><td colspan="3" class="muted">${q ? 'No match.' : 'No clients yet. They are added automatically when you save an order, or import a file.'}</td></tr>`;
+}
+function exportClients() {
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const lines = [['name', 'phone', 'address', 'location', 'lat', 'lng', 'depot', 'notes'].map(q).join(',')]
+    .concat(S.clients.map(c => [c.name, c.phone, c.address, c.lat != null ? gmaps(c.lat, c.lng) : '', c.lat, c.lng, (depotById(c.depotId) || {}).name || '', c.notes].map(q).join(',')));
+  download('clients.csv', '﻿' + lines.join('\r\n'), 'text/csv');
+}
+
+/* ===================== orders ===================== */
+let editReq = null, reqClientId = null;
+function resetReqForm() {
+  editReq = null; reqClientId = null; $('#reqFormTitle').textContent = 'New order';
+  ['rClient', 'rPhone', 'rAddress', 'rQty', 'rNotes'].forEach(id => $('#' + id).value = '');
+  $('#rUrgent').value = '0'; $('#rDepot').value = ''; clearLoc('r');
+}
+function fillFromClient() {
+  const c = S.clients.find(k => sameName(k.name, $('#rClient').value));
+  reqClientId = c ? c.id : null;
+  if (!c) return;
+  $('#rPhone').value = c.phone || ''; $('#rAddress').value = c.address || ''; $('#rDepot').value = c.depotId || '';
+  if (c.lat != null) { $('#rLoc').value = ''; setLoc('r', c, '✓ Saved location of this client'); }
+  else { clearLoc('r'); locMsg('r', 'This client has no location yet – paste the link they sent on WhatsApp.', 'w'); }
+}
+function saveReq() {
+  const loc = getLoc('r');
+  const r = {client: $('#rClient').value.trim(), phone: $('#rPhone').value.trim(), address: $('#rAddress').value.trim(), ...loc,
+    qty: +$('#rQty').value || 0, urgent: $('#rUrgent').value === '1', notes: $('#rNotes').value.trim(), depotId: $('#rDepot').value};
+  if (!r.client) return alert('Client name is required.');
+  if (!(r.qty > 0)) return alert('Quantity must be greater than 0.');
+  if (r.lat == null || r.lng == null) return alert('Location is required: paste the WhatsApp / Google Maps link, click "Find", or pick the point on the map.');
+  r.clientId = upsertClient({id: reqClientId, name: r.client, phone: r.phone, address: r.address, lat: r.lat, lng: r.lng, depotId: r.depotId || undefined});
+  if (editReq) Object.assign(S.requests.find(x => x.id === editReq), r);
+  else S.requests.push({id: uid(), active: true, ...r});
+  save(); resetReqForm(); renderAll();
+}
+function editRequest(id) {
+  const r = S.requests.find(x => x.id === id); editReq = id; reqClientId = r.clientId || null;
+  $('#reqFormTitle').textContent = 'Edit order – ' + r.client;
+  $('#rClient').value = r.client; $('#rPhone').value = r.phone || ''; $('#rAddress').value = r.address || '';
+  $('#rLoc').value = ''; $('#rQty').value = r.qty; $('#rUrgent').value = r.urgent ? '1' : '0'; $('#rNotes').value = r.notes || ''; $('#rDepot').value = r.depotId || '';
+  if (r.lat != null) setLoc('r', r, 'Current location'); else clearLoc('r');
+  $('#side').scrollTop = 0;
+}
+function delRequest(id) { if (!confirm('Delete this order?')) return; S.requests = S.requests.filter(x => x.id !== id); save(); renderAll(); }
+function toggleReq(id, v) { S.requests.find(x => x.id === id).active = v; save(); renderRequests(); drawMap(); }
+function clearRequests() { if (!confirm('Delete ALL open orders? (Clients stay saved.)')) return; S.requests = []; S.plan = null; save(); renderAll(); }
+function renderRequests() {
+  const u = S.settings.unit, multi = S.depots.length > 1;
+  $('#reqBody').innerHTML = S.requests.map(r => `<tr class="${r.active === false ? 'off' : ''}">
+    <td><input type="checkbox" ${r.active !== false ? 'checked' : ''} onchange="toggleReq('${r.id}',this.checked)" title="Include in plan"></td>
+    <td><b>${esc(r.client)}</b> ${r.urgent ? '<span class="tag u">urgent</span>' : ''}<br><span class="muted">${esc(r.address)}${multi && depotById(r.depotId) ? ' · ⛽ ' + esc(depotById(r.depotId).name) : ''}</span></td>
+    <td class="num">${fmt(r.qty)}</td>
+    <td>${r.lat != null ? `<a class="ml tag ok" href="${gmaps(r.lat, r.lng)}" target="_blank">🗺 set</a>` : '<span class="tag w">missing</span>'}</td>
+    <td class="num"><button class="x" title="Edit" onclick="editRequest('${r.id}')">✏️</button><button class="x" title="Delete" onclick="delRequest('${r.id}')">✖</button></td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">No open orders.</td></tr>';
+  const act = S.requests.filter(r => r.active !== false);
+  const tot = act.reduce((s, r) => s + r.qty, 0);
+  const cap = S.trucks.filter(t => t.active !== false).reduce((s, t) => s + t.cap, 0);
+  const trips = cap ? Math.ceil(tot / cap) : 0;
+  $('#reqSummary').innerHTML = `${act.length} active orders · total <b>${fmt(tot)} ${u}</b> · fleet carries <b>${fmt(cap)} ${u}</b> per round` +
+    (trips > 1 ? ` <span class="tag w">needs ~${trips} rounds of trips – planner will schedule them</span>` : '');
+}
+
+/* ===================== import locations / orders from a file ===================== */
+function parseCSV(text) {
+  const first = text.split(/\r?\n/)[0] || '';
+  const sep = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : (first.includes('\t') && !first.includes(',') ? '\t' : ',');
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === sep) { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(x => String(x).trim()));
+}
+const FIELDS = {   // field: [label, header names that mean this field (English + Arabic)]
+  client:   ['Customer name *', ['name', 'client', 'customer', 'client name', 'customer name', 'company', 'title', 'الاسم', 'اسم', 'اسم الزبون', 'الزبون', 'الزبائن', 'العميل', 'اسم العميل', 'الشركة', 'اسم الشركة']],
+  phone:    ['Phone', ['phone', 'mobile', 'tel', 'telephone', 'whatsapp', 'phone number', 'mobile number', 'contact', 'الهاتف', 'هاتف', 'رقم الهاتف', 'الجوال', 'جوال', 'موبايل', 'الموبايل', 'واتساب', 'رقم', 'تلفون', 'التلفون']],
+  address:  ['Address', ['address', 'delivery address', 'area', 'city', 'region', 'street', 'العنوان', 'عنوان', 'المنطقة', 'منطقة', 'المدينة', 'البلدة', 'الشارع']],
+  location: ['Location link', ['location', 'link', 'map', 'maps', 'google maps', 'maps link', 'location link', 'gps', 'url', 'google maps url', 'coordinates', 'الموقع', 'موقع', 'رابط', 'رابط الموقع', 'الخريطة', 'لوكيشن', 'اللوكيشن', 'الإحداثيات']],
+  lat:      ['Latitude', ['lat', 'latitude', 'خط العرض']],
+  lng:      ['Longitude', ['lng', 'lon', 'long', 'longitude', 'خط الطول']],
+  qty:      ['Quantity (order)', ['qty', 'quantity', 'liters', 'litres', 'amount', 'order', 'الكمية', 'كمية', 'ليتر', 'لتر', 'الطلب']],
+  urgent:   ['Urgent', ['urgent', 'priority', 'مستعجل', 'عاجل', 'أولوية', 'الأولوية']],
+  depot:    ['Depot', ['depot', 'المستودع', 'مستودع', 'المخزن']],
+  notes:    ['Notes', ['notes', 'note', 'remarks', 'description', 'comment', 'comments', 'ملاحظات', 'ملاحظة', 'ملاحظه']]
+};
+const normH = s => String(s ?? '').trim().toLowerCase().replace(/[_\-.:*]+/g, ' ').replace(/\s+/g, ' ').replace(/[إأآ]/g, 'ا');
+function detectColumns(header) {
+  const h = header.map(normH), map = {}, used = new Set();
+  const pass = test => { for (const f in FIELDS) if (map[f] === undefined) {
+    const i = h.findIndex((x, k) => !used.has(k) && x && FIELDS[f][1].some(a => test(x, normH(a))));
+    if (i >= 0) { map[f] = i; used.add(i); } } };
+  pass((x, a) => x === a);                                   // exact names first
+  pass((x, a) => a.length >= 3 && (x.includes(a) || (x.length >= 3 && a.includes(x))));   // then "contains"
+  return map;
+}
+function findHeaderRow(rows) {   // the row (among the first 10) whose cells look most like column names
+  let best = 0, bestN = -1;
+  rows.slice(0, 10).forEach((r, i) => { const n = Object.keys(detectColumns(r)).length; if (n > bestN) { best = i; bestN = n; } });
+  return best;
+}
+function rowsToRecords(rows, map, headerRow = 0) {
+  if (map.client === undefined) throw new Error('Choose which column has the customer name.');
+  return rows.slice(headerRow + 1).map(r => { const g = k => map[k] !== undefined && map[k] !== '' ? String(r[map[k]] ?? '').trim() : '';
+    return {client: g('client'), phone: g('phone'), address: g('address'), location: g('location'), lat: numOrNull(g('lat')), lng: numOrNull(g('lng')),
+      qty: +String(g('qty')).replace(/[^\d.]/g, '') || 0, urgent: /^(1|yes|true|y|urgent|high|نعم|عاجل|مستعجل)$/i.test(g('urgent')),
+      notes: g('notes'), depot: g('depot')}; }).filter(x => x.client);
+}
+function recLoc(x) {
+  if (x.lat != null && x.lng != null && isFinite(x.lat) && isFinite(x.lng) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180) return {lat: x.lat, lng: x.lng};
+  return parseLocation(x.location) || parseLocation(x.address);
+}
+function kmlRecords(text, gpx) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  const txt = (el, tag) => { const e = el.getElementsByTagName(tag)[0]; return e ? e.textContent.replace(/<[^>]+>/g, ' ').trim() : ''; };
+  if (gpx) return [...doc.getElementsByTagName('wpt')].map(w => ({client: txt(w, 'name'), address: txt(w, 'desc'), lat: +w.getAttribute('lat'), lng: +w.getAttribute('lon')}));
+  return [...doc.getElementsByTagName('Placemark')].map(p => {
+    const pt = p.getElementsByTagName('Point')[0]; if (!pt) return null;
+    const [lng, lat] = txt(pt, 'coordinates').split(',').map(Number);
+    return {client: txt(p, 'name'), address: txt(p, 'address') || txt(p, 'description'), lat, lng};
+  }).filter(Boolean);
+}
+function geojsonRecords(j) {
+  return (j.features || []).map(f => {
+    const pr = f.properties || {}, loc = pr.location || pr.Location || {};
+    let [lng, lat] = (f.geometry && f.geometry.coordinates) || [];
+    if (!lat && !lng) { const c = parseLocation(pr.google_maps_url || pr['Google Maps URL'] || ''); if (c) ({lat, lng} = c); }
+    return {client: pr.name || pr.Title || loc.name || loc['Business Name'] || '', address: loc.address || loc.Address || pr.address || '',
+      lat, lng, phone: pr.phone || '', notes: pr.description || pr.Comment || ''};
+  });
+}
+async function needXLSX() {
+  if (window.XLSX) return;
+  try { await loadScript('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'); }
+  catch (e) { throw new Error('Reading Excel files needs an internet connection. Connect to the internet, or in Excel use "Save As → CSV" and upload the CSV file.'); }
+}
+
+/* ---------- upload → preview → create (mode "clients" or "orders") ---------- */
+let IMP = null, UPLOAD_MODE = 'clients';
+function startUpload(mode) { UPLOAD_MODE = mode; $('#impFile').click(); }
+const impBox = () => $(IMP && IMP.mode === 'orders' ? '#impBoxR' : '#impBoxC');
+const savedClient = x => S.clients.find(k => sameName(k.name, x.client));
+async function importFile(inp) {
+  const f = inp.files[0]; inp.value = ''; if (!f) return;
+  const ext = f.name.split('.').pop().toLowerCase(), mode = UPLOAD_MODE;
+  try {
+    if (ext === 'kmz') throw new Error('KMZ is a compressed file. In Google My Maps / Google Earth choose "Export as KML" (tick "Export to a .KML file") and upload that.');
+    if (['kml', 'gpx', 'geojson', 'json'].includes(ext)) {
+      if (mode === 'orders') throw new Error('Map files have no quantities. Upload orders as an Excel or CSV file (use the orders template).');
+      const recs = ext === 'kml' || ext === 'gpx' ? kmlRecords(await f.text(), ext === 'gpx') : geojsonRecords(JSON.parse(await f.text()));
+      return importRecords(recs, {orders: false});
+    }
+    let sheets = {};
+    if (['xlsx', 'xls', 'xlsm', 'ods'].includes(ext)) {
+      await needXLSX();
+      const wb = XLSX.read(await f.arrayBuffer());
+      wb.SheetNames.forEach(n => sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], {header: 1, raw: false, defval: ''}).filter(r => r.some(x => String(x).trim())));
+    } else sheets['Sheet1'] = parseCSV((await f.text()).replace(/^﻿/, ''));
+    const first = Object.keys(sheets).find(n => sheets[n].length > 1) || Object.keys(sheets)[0];
+    if (IMP) impBox().innerHTML = '';
+    IMP = {name: f.name, mode, sheets, orders: true, geo: true};
+    useSheet(first);
+    showTab(mode === 'orders' ? 'requests' : 'clients'); $('#side').scrollTop = 0;
+  } catch (e) { alert('Upload failed: ' + (e.message || e)); }
+}
+function useSheet(name) {
+  IMP.sheet = name; IMP.rows = IMP.sheets[name] || [];
+  IMP.headerRow = findHeaderRow(IMP.rows); IMP.map = detectColumns(IMP.rows[IMP.headerRow] || []);
+  renderImport();
+}
+function impSet(field, v) { if (v === '') delete IMP.map[field]; else IMP.map[field] = +v; renderImport(); }
+function cancelImport() { const b = impBox(); IMP = null; b.innerHTML = ''; }
+// where will this row's location come from?
+function locSource(x, ordersMode) {
+  const c = recLoc(x); if (c) return {kind: 'file', c};
+  const k = savedClient(x); if (k && k.lat != null) return {kind: 'saved', c: k};
+  if (x.address) return {kind: 'address'};
+  return {kind: 'none'};
+}
+function renderImport() {
+  if (!IMP) return;
+  const box = impBox(), ord = IMP.mode === 'orders', u = S.settings.unit;
+  const header = IMP.rows[IMP.headerRow] || [];
+  const colName = i => `${String.fromCharCode(65 + (i % 26))}${i >= 26 ? Math.floor(i / 26) : ''}: ${String(header[i] ?? '').trim() || '(no title)'}`;
+  let all = [];
+  try { all = rowsToRecords(IMP.rows, IMP.map, IMP.headerRow); } catch (e) {}
+  const recs = ord ? all.filter(x => x.qty > 0) : all, noQty = ord ? all.length - recs.length : 0;
+  const src = recs.map(x => locSource(x)), cnt = k => src.filter(s => s.kind === k).length;
+  const existing = recs.filter(savedClient).length;
+  const sheetNames = Object.keys(IMP.sheets);
+  let h = `<div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
+    <b>📄 ${esc(IMP.name)}</b> ${sheetNames.length > 1 ? `– sheet <select style="width:auto" onchange="useSheet(this.value)">${sheetNames.map(n => `<option ${n === IMP.sheet ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''}
+    <p class="hint">Check which column is which (detected automatically – change it if wrong):</p>
+    <div class="grid">${Object.keys(FIELDS).map(f => `<div><label>${f === 'qty' && ord ? 'Quantity *' : FIELDS[f][0]}</label><select onchange="impSet('${f}',this.value)">
+      <option value="">— not in the file —</option>${header.map((_, i) => `<option value="${i}" ${IMP.map[f] === i ? 'selected' : ''}>${esc(colName(i))}</option>`).join('')}</select></div>`).join('')}</div>`;
+  if (IMP.map.client === undefined) h += `<div class="badbox" style="margin-top:10px">Choose which column has the <b>customer name</b>.</div>`;
+  else if (ord && IMP.map.qty === undefined) h += `<div class="badbox" style="margin-top:10px">Choose which column has the <b>quantity</b>.</div>`;
+  else {
+    const total = recs.reduce((s, x) => s + x.qty, 0);
+    const what = ord ? `<b>${recs.length} orders</b> · total <b>${fmt(total)} ${u}</b><br>${existing} saved customers matched · ${recs.length - existing} new customers`
+                     : `<b>${recs.length} customers</b> found: ${recs.length - existing} new${existing ? `, ${existing} already in the list (will be updated)` : ''}`;
+    h += `<div class="infobox" style="margin-top:10px">${what}<br>
+      Location: ${cnt('file')} from the file${ord ? ` · ${cnt('saved')} from saved customers` : ''}${cnt('address') ? ` · ${cnt('address')} to find from the address` : ''}${cnt('none') ? ` · <b style="color:var(--bad)">${cnt('none')} missing</b>` : ''}
+      ${noQty ? `<br><span class="muted">${noQty} rows without a quantity are skipped.</span>` : ''}</div>
+      <table><thead><tr><th>Customer</th><th>Address</th><th>Location</th>${IMP.map.qty !== undefined ? '<th class="num">Qty</th>' : ''}</tr></thead><tbody>
+      ${recs.slice(0, 6).map((x, i) => { const s = src[i];
+        const tag = s.kind === 'file' ? `<span class="tag ok">✓ in file</span>` : s.kind === 'saved' ? '<span class="tag ok">✓ saved customer</span>'
+          : s.kind === 'address' ? '<span class="tag w">from address</span>' : '<span class="tag u">missing</span>';
+        return `<tr><td>${esc(x.client)} ${x.urgent ? '<span class="tag u">urgent</span>' : ''}${ord && !savedClient(x) ? ' <span class="tag">new</span>' : ''}</td><td>${esc(x.address)}</td><td>${tag}</td>
+        ${IMP.map.qty !== undefined ? `<td class="num">${x.qty ? fmt(x.qty) : ''}</td>` : ''}</tr>`; }).join('')}
+      ${recs.length > 6 ? `<tr><td colspan="4" class="muted">… and ${recs.length - 6} more</td></tr>` : ''}</tbody></table>
+      ${cnt('address') ? `<label style="margin-top:8px;color:var(--ink)"><input type="checkbox" ${IMP.geo ? 'checked' : ''} onchange="IMP.geo=this.checked"> Find the location on the map from the address for the ${cnt('address')} rows without a link (needs internet – check them afterwards)</label>` : ''}
+      ${!ord && recs.some(x => x.qty > 0) ? `<label style="margin-top:4px;color:var(--ink)"><input type="checkbox" ${IMP.orders ? 'checked' : ''} onchange="IMP.orders=this.checked"> Also create ${recs.filter(x => x.qty > 0).length} orders from the quantity column</label>` : ''}
+      <div class="actions"><button class="b p big" onclick="runImport()" ${recs.length ? '' : 'disabled'}>✅ Create ${recs.length} ${ord ? 'orders' : 'customers'}</button><button class="b" onclick="cancelImport()">Cancel</button></div>`;
+  }
+  box.innerHTML = h + '</div>';
+}
+async function runImport() {
+  const ord = IMP.mode === 'orders', box = impBox();
+  let recs = rowsToRecords(IMP.rows, IMP.map, IMP.headerRow);
+  if (ord) recs = recs.filter(x => x.qty > 0);
+  if (IMP.geo) {
+    const todo = recs.filter(x => locSource(x).kind === 'address');
+    for (let i = 0; i < todo.length; i++) {
+      box.innerHTML = `<div class="infobox" style="margin-top:10px">🔍 Finding locations from addresses… ${i + 1} / ${todo.length}<br><span class="muted">${esc(todo[i].client)} – ${esc(todo[i].address)}</span></div>`;
+      try { const c = await geocode(todo[i].address); todo[i].lat = c.lat; todo[i].lng = c.lng; todo[i].fromAddress = true; } catch (e) {}
+    }
+  }
+  const orders = ord || IMP.orders; IMP = null; box.innerHTML = '';
+  importRecords(recs, {orders, ordersMode: ord});
+}
+function importRecords(recs, opt = {orders: true}) {
+  let added = 0, updated = 0, orders = 0, qty = 0, noLoc = [], guessed = 0;
+  recs.forEach(x => {
+    if (!x || !String(x.client || '').trim()) return;
+    const c0 = recLoc(x);
+    const dep = x.depot ? S.depots.find(d => sameName(d.name, x.depot)) : null;
+    const existed = S.clients.some(k => sameName(k.name, x.client));
+    const id = upsertClient({name: String(x.client).trim(), phone: x.phone || '', address: x.address || '', notes: opt.ordersMode ? '' : (x.notes || ''),
+      lat: c0 ? c0.lat : null, lng: c0 ? c0.lng : null, depotId: dep ? dep.id : undefined});
+    existed ? updated++ : added++;
+    if (x.fromAddress) guessed++;
+    const c = S.clients.find(k => k.id === id);
+    if (c.lat == null) noLoc.push(c.name);
+    if (opt.orders && x.qty > 0) {
+      S.requests.push({id: uid(), active: true, clientId: id, client: c.name, phone: c.phone, address: c.address, lat: c.lat, lng: c.lng,
+        qty: x.qty, urgent: !!x.urgent, notes: x.notes || '', depotId: dep ? dep.id : (c.depotId || '')});
+      orders++; qty += x.qty;
+    }
+  });
+  save(); renderAll(); drawMap(true);
+  const head = opt.orders && orders ? `• ${orders} orders created (${fmt(qty)} ${S.settings.unit})\n• ${added} new customers · ${updated} saved customers` :
+    `• ${added} new customers created\n• ${updated} customers updated`;
+  alert('Done!\n' + head +
+    (guessed ? `\n\n${guessed} locations were found from the address – please check them on the map.` : '') +
+    (noLoc.length ? `\n\nNo location yet for: ${[...new Set(noLoc)].slice(0, 15).join(', ')}${noLoc.length > 15 ? '…' : ''}\nEdit them and paste the location link they send you.` : ''));
+}
+async function downloadTemplate(mode) {
+  const ord = mode === 'orders';
+  const rows = [['Name', 'Phone', 'Address', 'Location link', 'Quantity', 'Urgent', 'Depot', 'Notes'],
+    ['Hotel Al Bahr', '+961 3 000000', 'Jounieh – main road', 'https://maps.google.com/?q=33.9808,35.6178', ord ? '8000' : '', ord ? 'no' : '', '', 'Gate at the back'],
+    ['Zahle Laundry', '+961 70 000000', 'Zahle – Boulevard', '33.8463, 35.9020', ord ? '7000' : '', ord ? 'yes' : '', '', ''],
+    [ord ? 'Saved customer (location already known)' : 'Example without link', '', ord ? '' : 'Saida, Lebanon', '', ord ? '5000' : '', '', '', ord ? 'Only name + quantity needed for saved customers' : 'Location will be found from the address']];
+  const name = ord ? 'mazut-orders-template' : 'mazut-customers-template';
+  try {
+    await needXLSX();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch: 34}, {wch: 16}, {wch: 26}, {wch: 46}, {wch: 10}, {wch: 8}, {wch: 14}, {wch: 44}];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, ord ? 'Orders' : 'Customers');
+    XLSX.writeFile(wb, name + '.xlsx');
+  } catch (e) {   // offline: CSV opens in Excel too
+    download(name + '.csv', '﻿' + rows.map(r => r.map(v => '"' + v.replace(/"/g, '""') + '"').join(',')).join('\r\n'), 'text/csv');
+  }
+}
+
+/* ===================== trucks ===================== */
+let editTruck = null;
+function resetTruckForm() {
+  editTruck = null; $('#truckFormTitle').textContent = 'Add tanker truck';
+  ['tName', 'tPlate', 'tDriver', 'tPhone', 'tCap', 'tTrack'].forEach(id => $('#' + id).value = ''); $('#tActive').value = '1';
+  if (S.depots[0]) $('#tDepot').value = S.depots[0].id;
+}
+function saveTruck() {
+  const t = {name: $('#tName').value.trim(), plate: $('#tPlate').value.trim(), driver: $('#tDriver').value.trim(),
+    phone: $('#tPhone').value.trim(), cap: +$('#tCap').value || 0, active: $('#tActive').value === '1', depotId: $('#tDepot').value,
+    trackId: slugId($('#tTrack').value) || ''};
+  if (!t.name) return alert('Truck name is required.');
+  if (!t.trackId) t.trackId = slugId(t.name) || 'truck' + (S.trucks.length + 1);
+  if (S.trucks.some(x => x.id !== editTruck && trackIdOf(x) === t.trackId)) return alert('Another truck already uses the tracking ID "' + t.trackId + '".');
+  if (!(t.cap > 0)) return alert('Capacity must be greater than 0.');
+  if (editTruck) Object.assign(S.trucks.find(x => x.id === editTruck), t); else S.trucks.push({id: uid(), ...t});
+  save(); resetTruckForm(); renderAll();
+}
+function editTruckFn(id) {
+  const t = S.trucks.find(x => x.id === id); editTruck = id; $('#truckFormTitle').textContent = 'Edit truck – ' + t.name;
+  $('#tName').value = t.name; $('#tPlate').value = t.plate || ''; $('#tDriver').value = t.driver || ''; $('#tPhone').value = t.phone || '';
+  $('#tCap').value = t.cap; $('#tActive').value = t.active !== false ? '1' : '0'; $('#tDepot').value = (truckDepot(t) || {}).id || '';
+  $('#tTrack').value = trackIdOf(t);
+}
+function delTruck(id) { if (!confirm('Delete this truck?')) return; S.trucks = S.trucks.filter(x => x.id !== id); save(); renderAll(); }
+function renderTrucks() {
+  const u = S.settings.unit;
+  const list = [...S.trucks].sort((a, b) => b.cap - a.cap);
+  $('#truckBody').innerHTML = list.map(t => `<tr class="${t.active === false ? 'off' : ''}">
+    <td><b>${esc(t.name)}</b> ${t.active === false ? '<span class="tag">off</span>' : ''}<br><span class="muted">${esc(t.plate)}</span></td>
+    <td>${esc(t.driver)}<br><span class="muted">${esc(t.phone)}</span></td>
+    <td class="num">${fmt(t.cap)} ${u}</td>
+    <td>${esc((truckDepot(t) || {}).name || '—')}</td>
+    <td class="num"><button class="x" onclick="editTruckFn('${t.id}')">✏️</button><button class="x" onclick="delTruck('${t.id}')">✖</button></td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">No trucks yet.</td></tr>';
+  const act = S.trucks.filter(t => t.active !== false);
+  $('#truckSummary').innerHTML = `${act.length} available trucks · total capacity per trip <b>${fmt(act.reduce((s, t) => s + t.cap, 0))} ${u}</b>`;
+}
+
+/* ===================== depots ===================== */
+let editDepot = null;
+function resetDepotForm() { editDepot = null; $('#depotFormTitle').textContent = 'Add depot'; ['dName', 'dAddress'].forEach(id => $('#' + id).value = ''); clearLoc('d'); }
+function saveDepot() {
+  const d = {name: $('#dName').value.trim(), address: $('#dAddress').value.trim(), ...getLoc('d')};
+  if (!d.name) return alert('Depot name is required.');
+  if (d.lat == null || d.lng == null) return alert('Depot location is required: paste a Google Maps link, click Find, or pick it on the map.');
+  if (editDepot) Object.assign(depotById(editDepot), d);
+  else { S.depots.push({id: uid(), ...d}); if (S.depots.length === 1) S.trucks.forEach(t => t.depotId ||= S.depots[0].id); }
+  save(); resetDepotForm(); renderAll(); drawMap(true);
+}
+function editDepotFn(id) {
+  const d = depotById(id); editDepot = id; $('#depotFormTitle').textContent = 'Edit depot – ' + d.name;
+  $('#dName').value = d.name; $('#dAddress').value = d.address || ''; $('#dLoc').value = ''; setLoc('d', d, 'Current location');
+}
+function delDepot(id) {
+  const n = S.trucks.filter(t => t.depotId === id).length;
+  if (!confirm(`Delete this depot?${n ? `\n${n} truck(s) based here will move to the first remaining depot.` : ''}`)) return;
+  S.depots = S.depots.filter(d => d.id !== id);
+  S.trucks.forEach(t => { if (t.depotId === id) t.depotId = S.depots[0] ? S.depots[0].id : ''; });
+  [...S.clients, ...S.requests].forEach(x => { if (x.depotId === id) x.depotId = ''; });
+  save(); renderAll(); drawMap();
+}
+function renderDepots() {
+  $('#depotBody').innerHTML = S.depots.map(d => { const tr = S.trucks.filter(t => truckDepot(t) === d);
+    return `<tr><td><b>⛽ ${esc(d.name)}</b><br><span class="muted">${esc(d.address)}</span> <a class="ml" href="${gmaps(d.lat, d.lng)}" target="_blank">🗺</a></td>
+    <td>${tr.length} trucks<br><span class="muted">${fmt(tr.reduce((s, t) => s + t.cap, 0))} ${S.settings.unit}</span></td>
+    <td class="num"><button class="x" onclick="editDepotFn('${d.id}')">✏️</button><button class="x" onclick="delDepot('${d.id}')">✖</button></td></tr>`; }).join('')
+    || '<tr><td colspan="3" class="muted">No depot yet – add where your trucks load.</td></tr>';
+}
+
+/* ===================== settings ===================== */
+function fillSettings() {
+  const s = S.settings;
+  $('#sCompany').value = s.company; $('#sUnit').value = s.unit;
+  $('#sRadius').value = s.maxRadius; $('#sRoad').value = s.roadFactor; $('#sSplit').value = s.allowSplit ? '1' : '0';
+  $('#sMinSplit').value = s.minSplit; $('#sTrips').value = s.maxTrips; $('#sSpeed').value = s.speed; $('#sService').value = s.serviceMin;
+  $('#sLoadMin').value = s.loadMin; $('#sDayStart').value = s.dayStart; $('#sDayEnd').value = s.dayEnd; $('#sMultiDay').value = s.multiDay ? '1' : '0';
+  document.querySelectorAll('.unit').forEach(e => e.textContent = s.unit);
+  $('#company').textContent = s.company;
+}
+function saveSettings(quiet) {
+  const s = S.settings;
+  s.company = $('#sCompany').value.trim(); s.unit = $('#sUnit').value;
+  s.maxRadius = Math.max(1, +$('#sRadius').value || 30); s.roadFactor = Math.max(1, +$('#sRoad').value || 1.3);
+  s.allowSplit = $('#sSplit').value === '1'; s.minSplit = Math.max(0, +$('#sMinSplit').value || 0);
+  s.maxTrips = Math.min(20, Math.max(0, Math.round(+$('#sTrips').value || 0)));
+  s.loadMin = Math.max(0, +$('#sLoadMin').value || 0);
+  s.dayStart = $('#sDayStart').value || '07:00'; s.dayEnd = $('#sDayEnd').value || '17:00';
+  if (hm(s.dayEnd) <= hm(s.dayStart)) { s.dayEnd = '17:00'; s.dayStart = '07:00'; alert('Working day end must be after start – reset to 07:00–17:00.'); }
+  s.multiDay = $('#sMultiDay').value === '1';
+  s.speed = Math.max(5, +$('#sSpeed').value || 35); s.serviceMin = Math.max(0, +$('#sService').value || 0);
+  save(); fillSettings(); renderAll(); if (!quiet) alert('Settings saved.');
+}
+
+/* ===================== PLANNER ===================== */
+/*
+  Time-based trip scheduler with several depots
+  - Every truck starts at its home depot at the plan start time. Whichever truck is free first (back at its
+    depot earliest) gets the next load, so when a driver returns, his next trip is already planned.
+  - Each order belongs to the client's chosen depot, or else the nearest depot that has trucks.
+    A depot's trucks serve its own orders first; when it has none left, its free trucks help other depots.
+  - For each load: start with the most urgent / farthest order still waiting, group the nearby orders
+    (cluster radius), choose the smallest free truck that can carry the whole group (else the largest free
+    truck), and fill the tank – splitting an order when it does not fit (if allowed).
+  - Stops are ordered nearest-neighbour + 2-opt. Trip time = loading + driving + unloading per stop.
+  - A trip that would end after the working day moves to the next working day.
+  - This repeats until every ordered quantity is assigned to a trip.
+*/
+const truckColor = id => { const i = S.trucks.findIndex(t => t.id === id); return COLORS[(i < 0 ? 0 : i) % COLORS.length]; };
+function initPlanInputs() {
+  if (!$('#pDate').value) $('#pDate').value = todayISO();
+  if (!$('#pTime').value) $('#pTime').value = S.settings.dayStart;
+}
+function planNow() { const d = new Date(); $('#pDate').value = todayISO(); $('#pTime').value = `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+
+function fillLoad(cap, seed, pool, maxCap) {
+  const st = S.settings, rem = new Map(pool.map(r => [r, r.rem])), out = [], members = [];
+  while (cap > EPS) {
+    const cand = pool.filter(r => rem.get(r) > EPS);
+    if (!cand.length) break;
+    let pick = null, q = 0;
+    if (!members.length && (rem.get(seed) <= cap + EPS || st.allowSplit || rem.get(seed) > maxCap)) { pick = seed; q = Math.min(rem.get(seed), cap); }
+    else {
+      const dTo = r => members.length ? Math.min(...members.map(m => hav(m, r))) : hav(seed, r);
+      cand.sort((a, b) => dTo(a) - dTo(b));
+      pick = cand.find(r => rem.get(r) <= cap + EPS);
+      if (pick) q = rem.get(pick);
+      else {
+        const r = cand[0];
+        if ((st.allowSplit || rem.get(r) > maxCap) && (cap >= st.minSplit || !members.length)) { pick = r; q = cap; }
+        else break;
+      }
+    }
+    rem.set(pick, rem.get(pick) - q); cap -= q; out.push({r: pick, q}); members.push(pick);
+  }
+  return out;
+}
+
+function runPlan() {
+  const st = S.settings;
+  if (!S.depots.length) { showTab('depots'); return alert('Add at least one depot first (Depots tab).'); }
+  const trucks = S.trucks.filter(t => t.active !== false && t.cap > 0);
+  if (!trucks.length) { showTab('trucks'); return alert('Add at least one available truck.'); }
+  const old = S.plan;
+  if (old && old.routes.some(r => r.status === 'planned') &&
+      !confirm('Re-plan all trips that have not started yet?\n\nCompleted trips and trucks already on the road are kept.')) return;
+  const kept = old ? old.routes.filter(r => r.status === 'done' || r.status === 'out') : [];
+
+  // which depot serves each order: the chosen one (if it has trucks), else the nearest depot with trucks
+  const activeDepots = [...new Set(trucks.map(t => truckDepot(t)))];
+  const homeOf = r => { const fixed = activeDepots.find(d => d.id === r.depotId); if (fixed) return fixed.id;
+    return activeDepots.reduce((b, d) => hav(d, r) < hav(b, r) ? d : b).id; };
+
+  // quantities still to plan = ordered − what is already on a truck on the road
+  const onRoad = {};
+  kept.filter(r => r.status === 'out').forEach(r => r.stops.forEach(s => onRoad[s.reqId] = (onRoad[s.reqId] || 0) + s.qty));
+  const active = S.requests.filter(r => r.active !== false);
+  const skipped = active.filter(r => r.lat == null || !(r.qty > 0));
+  const reqs = active.filter(r => r.lat != null && r.qty > 0)
+    .map(r => ({id: r.id, lat: r.lat, lng: r.lng, rem: +r.qty - (onRoad[r.id] || 0), urgent: !!r.urgent, home: homeOf(r)}))
+    .filter(r => r.rem > EPS);
+  if (!reqs.length) return alert('Nothing left to plan – all active orders are delivered or already on the road.');
+
+  const startDate = $('#pDate').value || todayISO();
+  const midnight = new Date(startDate + 'T00:00').getTime();
+  const toMs = m => midnight + m * 60000, toMin = ms => (ms - midnight) / 60000;
+  const D0 = hm(st.dayStart), D1 = hm(st.dayEnd), MAX_DAYS = st.multiDay ? 60 : 1;
+  const maxCap = Math.max(...trucks.map(t => t.cap));
+  const nextDay = f => { f.day++; f.at = f.day * 1440 + D0; f.tripsToday = 0; };
+  const fixDay = f => {   // keep the truck's free time inside working hours
+    f.day = Math.floor(f.at / 1440);
+    const inDay = f.at - f.day * 1440;
+    if (inDay >= D1) nextDay(f); else if (inDay < D0) f.at = f.day * 1440 + D0;
+  };
+
+  const fleet = trucks.map(t => {
+    const f = {t, dep: truckDepot(t), at: Math.max(0, hm($('#pTime').value || st.dayStart)), day: 0, tripsToday: 0,
+      trips: kept.filter(r => r.truckId === t.id).length};
+    kept.filter(r => r.truckId === t.id && r.status === 'out').forEach(r => {   // on the road: free when it is back
+      const back = toMin(new Date(r.startedAt).getTime() + r.dur * 60000);
+      if (back > f.at) f.at = back; f.tripsToday++;
+    });
+    kept.filter(r => r.truckId === t.id && r.status === 'done' && r.doneAt).forEach(r => {   // came back at doneAt
+      const back = toMin(new Date(r.doneAt).getTime());
+      if (back > f.at) f.at = back;
+      if (Math.floor(back / 1440) === Math.floor(f.at / 1440)) f.tripsToday++;
+    });
+    fixDay(f);
+    return f;
+  });
+
+  const byId = Object.fromEntries(S.requests.map(r => [r.id, r]));
+  const newRoutes = [];
+  for (let guard = 0; guard < 20000; guard++) {
+    const open = reqs.filter(r => r.rem > EPS);
+    if (!open.length) break;
+    const live = fleet.filter(f => f.day < MAX_DAYS);
+    if (!live.length) break;
+    const T = Math.min(...live.map(f => f.at));
+    const ready = live.filter(f => f.at <= T + EPS);
+
+    // among depots with a free truck now: serve the one with own orders waiting (urgent first, then most quantity)
+    let best = null;
+    for (const dep of [...new Set(ready.map(f => f.dep))]) {
+      const own = open.filter(r => r.home === dep.id);
+      const score = [own.length ? 1 : 0, own.some(r => r.urgent) ? 1 : 0, own.reduce((s, r) => s + r.rem, 0)];
+      const better = !best || (() => { for (let i = 0; i < 3; i++) if (score[i] !== best.score[i]) return score[i] > best.score[i]; return false; })();
+      if (better) best = {dep, own, score};
+    }
+    const dep = best.dep, helping = !best.own.length;
+    let cands = best.own;
+    if (helping) {
+      // help another depot only if this truck would reach the client sooner than that depot's own next free truck
+      const homeFree = id => Math.min(Infinity, ...live.filter(x => x.dep.id === id).map(x => x.at));
+      const arrive = (from, t0, r) => t0 + st.loadMin + roadKm(from, r) / st.speed * 60;
+      cands = open.filter(r => arrive(dep, T, r) < arrive(depotById(r.home), homeFree(r.home), r));
+      if (!cands.length) {   // nothing worth doing now – wait until the next truck comes back
+        const later = live.map(x => x.at).filter(a => a > T + EPS);
+        ready.filter(x => x.dep === dep).forEach(x => { x.at = later.length ? Math.min(...later) : x.at + 60; fixDay(x); });
+        continue;
+      }
+    }
+    cands.sort((a, b) => (b.urgent - a.urgent) || (helping ? hav(dep, a) - hav(dep, b) : hav(dep, b) - hav(dep, a)));
+    const seed = cands[0];
+    const pool = cands.filter(r => r === seed || roadKm(seed, r) <= st.maxRadius);
+    const groupQty = pool.reduce((s, r) => s + r.rem, 0);
+    const group = ready.filter(x => x.dep === dep).sort((a, b) => a.t.cap - b.t.cap);
+    const f = group.find(x => x.t.cap >= groupQty - EPS) || group[group.length - 1];
+
+    if (st.maxTrips && f.tripsToday >= st.maxTrips) { nextDay(f); continue; }
+    const load = fillLoad(f.t.cap, seed, pool, maxCap);
+    if (!load.length) { f.at += 30; fixDay(f); continue; }   // this truck can't take it – wait for another truck
+
+    const stops = orderStops(dep, load.map(x => ({reqId: x.r.id, qty: x.q, lat: x.r.lat, lng: x.r.lng})));
+    let prev = dep, km = 0;
+    const legs = stops.map(s => { const leg = roadKm(prev, s); km += leg; prev = s; return leg; });
+    const backKm = roadKm(prev, dep); km += backKm;
+    const dur = st.loadMin + km / st.speed * 60 + stops.length * st.serviceMin;
+    if (f.tripsToday > 0 && f.at + dur > f.day * 1440 + D1 + EPS) { nextDay(f); continue; }  // doesn't fit today
+
+    load.forEach(x => x.r.rem -= x.q);
+    const t = f.t;
+    newRoutes.push({id: uid(), status: 'planned', truckId: t.id, truckName: t.name, plate: t.plate, driver: t.driver,
+      driverPhone: t.phone, cap: t.cap, depotId: dep.id, depotName: dep.name, dLat: dep.lat, dLng: dep.lng,
+      tripNo: ++f.trips, depart: toMs(f.at), ret: toMs(f.at + dur), dur, km, backKm,
+      load: stops.reduce((s, x) => s + x.qty, 0),
+      stops: stops.map((s, k) => { const q = byId[s.reqId];
+        return {reqId: s.reqId, qty: s.qty, lat: s.lat, lng: s.lng, legKm: legs[k], client: q.client, phone: q.phone,
+          address: q.address, notes: q.notes, urgent: !!q.urgent, requested: q.qty, partial: s.qty < q.qty - EPS}; })});
+    f.at += dur; f.tripsToday++;
+  }
+
+  S.plan = {created: new Date().toISOString(), startDate, routes: [...kept, ...newRoutes],
+    unserved: reqs.filter(r => r.rem > EPS).map(r => ({reqId: r.id, client: byId[r.id].client, qty: r.rem})),
+    skipped: skipped.map(r => r.client)};
+  save(); renderPlan(); drawMap(true);
+}
+
+function orderStops(depot, pts) {
+  const rest = [...pts], ord = []; let cur = depot;
+  while (rest.length) { rest.sort((a, b) => hav(cur, a) - hav(cur, b)); cur = rest.shift(); ord.push(cur); }
+  const p = [depot, ...ord, depot]; let improved = true, guard = 0;
+  while (improved && guard++ < 200) {
+    improved = false;
+    for (let i = 1; i < p.length - 2; i++) for (let k = i + 1; k < p.length - 1; k++) {
+      const delta = hav(p[i - 1], p[k]) + hav(p[i], p[k + 1]) - hav(p[i - 1], p[i]) - hav(p[k], p[k + 1]);
+      if (delta < -1e-9) { p.splice(i, k - i + 1, ...p.slice(i, k + 1).reverse()); improved = true; }
+    }
+  }
+  return p.slice(1, -1);
+}
+
+/* ---------- trip status: planned → out (on the road) → done ---------- */
+const routeById = id => S.plan && S.plan.routes.find(r => r.id === id);
+function nextTripOf(truckId) {
+  return S.plan.routes.filter(r => r.truckId === truckId && r.status !== 'done').sort((a, b) => a.depart - b.depart)[0];
+}
+function startTrip(id) { const r = routeById(id); if (!r) return; r.status = 'out'; r.startedAt = new Date().toISOString(); save(); renderAll(); }
+function cancelStart(id) { const r = routeById(id); if (!r) return; r.status = 'planned'; delete r.startedAt; save(); renderAll(); }
+function completeTrip(id) {
+  const r = routeById(id); if (!r || r.status === 'done') return;
+  r.stops.forEach(s => { const q = S.requests.find(x => x.id === s.reqId); if (q) q.qty = Math.round((q.qty - s.qty) * 1000) / 1000; });
+  S.requests = S.requests.filter(q => q.qty > 0.001);
+  r.status = 'done'; r.doneAt = new Date().toISOString();
+  save(); renderAll();
+}
+function undoTrip(id) {
+  const r = routeById(id); if (!r || r.status !== 'done') return;
+  if (!confirm('Undo "completed" for this trip? Its quantities go back to the orders.')) return;
+  r.stops.forEach(s => {
+    const q = S.requests.find(x => x.id === s.reqId);
+    if (q) q.qty += s.qty;
+    else S.requests.push({id: s.reqId, active: true, client: s.client, phone: s.phone, address: s.address, lat: s.lat, lng: s.lng,
+      qty: s.qty, urgent: s.urgent, notes: s.notes, clientId: (S.clients.find(k => sameName(k.name, s.client)) || {}).id});
+  });
+  r.status = 'planned'; delete r.doneAt; delete r.startedAt;
+  save(); renderAll();
+}
+function clearCompleted() {
+  if (!S.plan) return;
+  S.plan.routes = S.plan.routes.filter(r => r.status !== 'done');
+  if (!S.plan.routes.length) S.plan = null;
+  save(); renderAll();
+}
+function routeLink(r) {   // Google Maps directions: depot → stops → depot
+  const p = [[r.dLat, r.dLng], ...r.stops.map(s => [s.lat, s.lng]), [r.dLat, r.dLng]].map(x => x[0].toFixed(6) + ',' + x[1].toFixed(6));
+  return 'https://www.google.com/maps/dir/' + p.join('/');
+}
+function whatsappLink(r) {
+  const u = S.settings.unit;
+  const msg = `${S.settings.company ? S.settings.company + ' – ' : ''}${r.truckName} – Trip ${r.tripNo}\n` +
+    `${fmtDay(r.depart)}, leave ${fmtTime(r.depart)} from ${r.depotName}\nLoad: ${fmt(r.load)} ${u}\n\n` +
+    r.stops.map((s, k) => `${k + 1}. ${s.client} – ${fmt(s.qty)} ${u}${s.phone ? ' – ' + s.phone : ''}\n   ${s.address ? s.address + '\n   ' : ''}${gmaps(s.lat.toFixed(6), s.lng.toFixed(6))}`).join('\n') +
+    `\n\nFull route: ${routeLink(r)}`;
+  const phone = String(r.driverPhone || '').replace(/\D/g, '').replace(/^00/, '');
+  return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+}
+
+/* ---------- driver board ---------- */
+function renderPlan() {
+  const P = S.plan, u = S.settings.unit, multi = S.depots.length > 1;
+  if (!P) { $('#planOut').innerHTML = '<p class="muted">No plan yet. Add orders, trucks and a depot, then click <b>Generate trip schedule</b>.</p>'; return; }
+  const todo = P.routes.filter(r => r.status !== 'done');
+  const load = todo.reduce((s, r) => s + r.load, 0), cap = todo.reduce((s, r) => s + r.cap, 0);
+  const finish = todo.length ? Math.max(...todo.map(r => r.ret)) : null;
+  let h = `<div class="stats">
+    <div class="stat"><b>${todo.length}</b><small>trips to do</small></div>
+    <div class="stat"><b>${fmt(load)}</b><small>${u} to deliver</small></div>
+    <div class="stat"><b>${cap ? Math.round(load / cap * 100) : 0}%</b><small>avg tank fill</small></div>
+    <div class="stat"><b>${finish ? fmtTime(finish) : '—'}</b><small>${finish ? 'all done ' + fmtDay(finish) : 'finished'}</small></div>
+  </div>`;
+  if (P.unserved.length) h += `<div class="badbox"><b>⚠ Could not be scheduled:</b><br>` +
+    P.unserved.map(x => `${esc(x.client)} – ${fmt(x.qty)} ${u}`).join('<br>') +
+    `<br><span class="hint">Allow "Continue next working day", raise "Max trips per day", or add trucks in Settings.</span></div>`;
+  if (P.skipped.length) h += `<div class="warnbox"><b>Skipped (no location):</b> ${P.skipped.map(esc).join(', ')}</div>`;
+
+  const truckIds = [...new Set(P.routes.map(r => r.truckId))]
+    .sort((a, b) => { const na = nextTripOf(a), nb = nextTripOf(b); return (na ? na.depart : Infinity) - (nb ? nb.depart : Infinity); });
+  truckIds.forEach(tid => {
+    const trips = P.routes.filter(r => r.truckId === tid).sort((a, b) => (a.status === 'done') - (b.status === 'done') || a.depart - b.depart);
+    const t0 = trips[0], c = truckColor(tid), next = nextTripOf(tid);
+    const doneN = trips.filter(r => r.status === 'done').length;
+    h += `<div class="card route" style="border-left-color:${c}">
+      <div class="head"><div><b style="font-size:15px">🚚 ${esc(t0.truckName)}</b> <span class="muted">${esc(t0.plate)} · ${fmt(t0.cap)} ${u}</span><br>
+        <span class="muted">Driver: ${esc(t0.driver) || '—'} ${t0.driverPhone ? '· ' + esc(t0.driverPhone) : ''}</span>${liveBadge(tid)}</div>
+        <div class="num">${next ? `<span class="tag ${next.status === 'out' ? 'w' : 'ok'}">${next.status === 'out' ? 'on the road – back ~' + fmtTime(new Date(next.startedAt).getTime() + next.dur * 60000) : 'next: trip ' + next.tripNo + ' at ' + fmtTime(next.depart)}</span>`
+          : '<span class="tag">no trips left</span>'}<br>
+          <span class="muted">${trips.length - doneN} to do · ${doneN} done</span>
+          ${next ? `<br><button class="b" style="margin-top:4px" onclick="printPlan('${tid}')">🖨 Print sheets</button>` : ''}</div></div>`;
+    trips.forEach(r => {
+      const isNext = next && r.id === next.id, pct = Math.round(r.load / r.cap * 100);
+      const tag = r.status === 'done' ? '<span class="tag ok">✓ completed</span>' : r.status === 'out' ? '<span class="tag w">🚚 on the road</span>'
+        : isNext ? '<span class="tag u">NEXT TRIP</span>' : '<span class="tag">planned</span>';
+      let btns = '';
+      if (r.status === 'done') btns = `<button class="x" title="Undo" onclick="undoTrip('${r.id}')">↩ undo</button>`;
+      else {
+        if (r.status === 'out') btns = `<button class="b p" onclick="completeTrip('${r.id}')">✅ Trip completed</button> <button class="x" onclick="cancelStart('${r.id}')">↩ not started</button>`;
+        else if (isNext) btns = `<button class="b" onclick="startTrip('${r.id}')">🚚 Start trip</button> <button class="b p" onclick="completeTrip('${r.id}')">✅ Trip completed</button>`;
+        btns += ` <a class="b" href="${routeLink(r)}" target="_blank">🗺 Route</a> <a class="b wa" href="${whatsappLink(r)}" target="_blank" title="Send this trip to the driver on WhatsApp">📲 WhatsApp driver</a>`;
+      }
+      h += `<div style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px;${r.status === 'done' ? 'opacity:.55' : ''}">
+        <div class="head"><div><b>Trip ${r.tripNo}</b> ${tag}<br><span class="muted">${fmtDay(r.depart)} · leave ${fmtTime(r.depart)} → back ~${fmtTime(r.ret)}${multi ? ' · ⛽ ' + esc(r.depotName) : ''}</span></div>
+          <div class="num"><b>${fmt(r.load)} / ${fmt(r.cap)} ${u}</b><br><span class="muted">${fmt(Math.round(r.km))} km</span></div></div>
+        ${r.status === 'done' ? `<div class="hint">${r.stops.map(s => esc(s.client) + ' ' + fmt(s.qty)).join(' · ')}</div>` : `
+        <div class="bar"><i style="width:${pct}%;background:${c}"></i></div>
+        <table><thead><tr><th>#</th><th>Client</th><th class="num">Unload</th><th class="num">km</th></tr></thead><tbody>
+        ${r.stops.map((s, k) => `<tr><td>${k + 1}</td><td><b>${esc(s.client)}</b> ${s.urgent ? '<span class="tag u">urgent</span>' : ''}
+          ${s.partial ? `<span class="tag w">part of ${fmt(s.requested)}</span>` : ''} <a class="ml" href="${gmaps(s.lat, s.lng)}" target="_blank" title="Open in Google Maps">🗺</a><br><span class="muted">${esc(s.address)}</span></td>
+          <td class="num"><b>${fmt(s.qty)}</b> ${u}</td><td class="num">${s.legKm.toFixed(1)}</td></tr>`).join('')}
+        <tr><td></td><td class="muted">Return to ${esc(r.depotName)}</td><td></td><td class="num">${r.backKm.toFixed(1)}</td></tr></tbody></table>`}
+        <div class="actions">${btns}</div></div>`;
+    });
+    h += '</div>';
+  });
+  $('#planOut').innerHTML = h;
+}
+
+function printPlan(truckId) {
+  const P = S.plan, u = S.settings.unit; if (!P) return alert('Generate a plan first.');
+  const list = P.routes.filter(r => r.status !== 'done' && (!truckId || r.truckId === truckId))
+    .sort((a, b) => a.truckName.localeCompare(b.truckName, undefined, {numeric: true}) || a.depart - b.depart);
+  if (!list.length) return alert('No open trips to print.');
+  $('#printArea').innerHTML = list.map(r => `<div class="sheet">
+    <h2>${esc(S.settings.company)} — Loading Sheet</h2>
+    <p><b>Truck:</b> ${esc(r.truckName)} ${esc(r.plate)} &nbsp; <b>Trip:</b> ${r.tripNo} &nbsp; <b>Date:</b> ${fmtDay(r.depart)}
+    &nbsp; <b>Leave:</b> ${fmtTime(r.depart)} &nbsp; <b>Back ~</b>${fmtTime(r.ret)}<br>
+    <b>Driver:</b> ${esc(r.driver)} ${esc(r.driverPhone)} &nbsp; <b>Load at depot:</b> ${fmt(r.load)} / ${fmt(r.cap)} ${u} &nbsp; <b>Est.:</b> ${Math.round(r.km)} km<br>
+    <b>Depot:</b> ${esc(r.depotName)}</p>
+    <table style="width:100%;border-collapse:collapse"><tr><th>#</th><th>Client</th><th>Phone</th><th>Address</th><th>Qty (${u})</th><th>Notes</th><th>Signature</th></tr>
+    ${r.stops.map((s, k) => `<tr><td>${k + 1}</td><td>${esc(s.client)}</td><td>${esc(s.phone)}</td><td>${esc(s.address)}<br><small>${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}</small></td>
+      <td><b>${fmt(s.qty)}</b>${s.partial ? ` <small>(of ${fmt(s.requested)})</small>` : ''}</td><td>${esc(s.notes)}</td><td style="width:110px"></td></tr>`).join('')}
+    </table></div>`).join('');
+  window.print();
+}
+function exportPlanCSV() {
+  const P = S.plan; if (!P) return alert('Generate a plan first.');
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const lines = [['Truck','Plate','Driver','Depot','Trip','Status','Date','Leave','Back','Truck capacity','Truck load','Stop #','Client','Phone','Address','Google Maps','Quantity','Ordered total','Partial','Leg km'].map(q).join(',')];
+  [...P.routes].sort((a, b) => a.truckName.localeCompare(b.truckName, undefined, {numeric: true}) || a.depart - b.depart)
+    .forEach(r => r.stops.forEach((s, k) => lines.push([r.truckName, r.plate, r.driver, r.depotName, r.tripNo, r.status, fmtDay(r.depart), fmtTime(r.depart), fmtTime(r.ret),
+      r.cap, r.load, k + 1, s.client, s.phone, s.address, gmaps(s.lat, s.lng), s.qty, s.requested, s.partial ? 'yes' : 'no', s.legKm.toFixed(1)].map(q).join(','))));
+  download(`trip-schedule-${P.startDate}.csv`, '﻿' + lines.join('\r\n'), 'text/csv');
+}
+
+/* ===================== LIVE DRIVER LOCATIONS (OwnTracks app on the phone → MQTT relay → this program) ===================== */
+/*
+  Each driver's phone runs the free OwnTracks app. It sends the phone's GPS position, encrypted with the company's
+  secret key (XSalsa20-Poly1305 "secretbox", the same encryption OwnTracks uses), to an MQTT relay on topic
+  owntracks/<company code>/<tracking ID>. This program listens on that topic over a WebSocket, decrypts the
+  positions and shows the trucks on the map. The relay only ever sees encrypted data.
+*/
+const LIVE_KEY = KEY + '.live';
+let LIVE = (() => { try { return JSON.parse(localStorage.getItem(LIVE_KEY)) || {}; } catch (e) { return {}; } })();
+let mq = null, liveState = 'off', liveMsg = '', liveLayer = null, liveMarkers = {}, setupFor = null;
+if (map) liveLayer = L.layerGroup().addTo(map);
+const randStr = n => { const a = new Uint8Array(n); crypto.getRandomValues(a); return [...a].map(b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join(''); };
+const slugId = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '').slice(0, 20);
+const trackIdOf = t => t.trackId || slugId(t.name) || 'truck' + (S.trucks.indexOf(t) + 1);
+function trk() {
+  if (!S.tracking) { S.tracking = {broker: 'broker.hivemq.com', tlsPort: 8883, wsPort: 8884, code: 'mz' + randStr(8), key: randStr(24), user: '', pass: '', auto: false}; save(); }
+  return S.tracking;
+}
+function ensureTrackIds() {   // give every truck a permanent, unique tracking ID
+  let changed = false;
+  S.trucks.forEach((t, i) => {
+    if (t.trackId) return;
+    let id = slugId(t.name) || 'truck' + (i + 1), n = 2;
+    while (S.trucks.some(x => x !== t && x.trackId === id)) id = (slugId(t.name) || 'truck') + n++;
+    t.trackId = id; changed = true;
+  });
+  if (changed) save();
+}
+const keyBytes = s => { const k = new Uint8Array(32); k.set(new TextEncoder().encode(s).slice(0, 32)); return k; };   // OwnTracks key rule
+function ago(ms) {
+  const m = Math.round((Date.now() - ms) / 60000);
+  return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min ago' : fmtWhen(ms);
+}
+
+/* ---------- connection ---------- */
+function setLive(state, msg) { liveState = state; liveMsg = msg; renderLive(); }
+function liveToggle() { liveState === 'off' || liveState === 'error' ? connectLive() : disconnectLive(); }
+async function connectLive() {
+  const T = trk();
+  setLive('connecting', 'Connecting…');
+  try {
+    if (!window.mqtt) await loadScript('https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js');
+    if (!window.nacl) await loadScript('https://unpkg.com/tweetnacl@1.0.3/nacl-fast.min.js');
+  } catch (e) { return setLive('error', 'Live locations need an internet connection.'); }
+  if (mq) mq.end(true);
+  mq = mqtt.connect(`wss://${T.broker}:${T.wsPort}/mqtt`, {clientId: 'mazut-office-' + randStr(10), username: T.user || undefined,
+    password: T.pass || undefined, reconnectPeriod: 5000, connectTimeout: 20000, clean: true});
+  mq.on('connect', () => { mq.subscribe(`owntracks/${T.code}/+`); setLive('on', 'Connected – live positions appear as soon as a phone sends one.'); });
+  mq.on('reconnect', () => setLive('connecting', 'Connection lost – reconnecting…'));
+  mq.on('error', e => setLive('error', 'Connection error: ' + e.message));
+  mq.on('message', onLiveMsg);
+  T.auto = true; save();
+}
+function disconnectLive() { if (mq) mq.end(true); mq = null; trk().auto = false; save(); setLive('off', 'Not connected.'); }
+function onLiveMsg(topic, buf) {
+  const dev = topic.split('/')[2]; if (!dev) return;
+  let j;
+  try { const txt = new TextDecoder().decode(buf); if (!txt.trim()) return; j = JSON.parse(txt); } catch (e) { return; }
+  if (j._type === 'encrypted') {
+    const raw = Uint8Array.from(atob(j.data), c => c.charCodeAt(0));
+    const out = raw.length > 40 && nacl.secretbox.open(raw.slice(24), raw.slice(0, 24), keyBytes(trk().key));
+    if (!out) { LIVE[dev] = {...(LIVE[dev] || {}), warn: 'wrong secret key on this phone'}; return renderLive(); }
+    j = JSON.parse(new TextDecoder().decode(out));
+  } else if (j._type === 'location') { LIVE[dev] = {...(LIVE[dev] || {}), warn: 'phone is not using the secret key – positions ignored'}; return renderLive(); }
+  if (j._type !== 'location' || !isFinite(j.lat) || !isFinite(j.lon)) return;
+  LIVE[dev] = {lat: +j.lat, lng: +j.lon, tst: (j.tst ? j.tst * 1000 : Date.now()), vel: j.vel, batt: j.batt, acc: j.acc};
+  localStorage.setItem(LIVE_KEY, JSON.stringify(LIVE));
+  drawLive(); renderLive();
+}
+
+/* ---------- what is the truck doing? ---------- */
+function liveInfo(t) {
+  const p = LIVE[trackIdOf(t)];
+  if (!p || p.lat == null) return {p, text: p && p.warn ? '⚠ ' + p.warn : 'no position yet', cls: p && p.warn ? 'u' : ''};
+  const age = Date.now() - p.tst, stale = age > 15 * 60000;
+  const moving = !stale && p.vel > 3;
+  let where = '';
+  const dep = truckDepot(t);
+  if (dep && hav(dep, p) < 0.4) where = 'at ' + dep.name;
+  const trip = S.plan && S.plan.routes.find(r => r.truckId === t.id && r.status === 'out');
+  if (trip && !where) {
+    const near = trip.stops.map(s => ({s, d: hav(s, p)})).sort((a, b) => a.d - b.d)[0];
+    if (near) where = near.d < 0.3 ? 'at ' + near.s.client : `${near.d.toFixed(1)} km from ${near.s.client}`;
+  }
+  return {p, stale, moving, trip, where,
+    text: `${moving ? `🟢 moving ${Math.round(p.vel)} km/h` : stale ? '⚪ last seen' : '🟡 stopped'}${where ? ' · ' + where : ''}`,
+    cls: stale ? '' : moving ? 'ok' : 'w'};
+}
+function liveBadge(truckId) {
+  const t = S.trucks.find(x => x.id === truckId); if (!t) return '';
+  const i = liveInfo(t); if (!i.p || i.p.lat == null) return '';
+  return `<br><a href="#" class="ml" onclick="showTruck('${t.id}');return false"><span class="tag ${i.cls}">📡 ${esc(i.text)} · ${ago(i.p.tst)}</span></a>`;
+}
+
+/* ---------- map ---------- */
+function drawLive() {
+  if (!liveLayer) return;
+  const seen = new Set();
+  S.trucks.forEach(t => {
+    const i = liveInfo(t); if (!i.p || i.p.lat == null) return;
+    const id = trackIdOf(t); seen.add(id);
+    const col = i.stale ? '#8a8f99' : truckColor(t.id);
+    const icon = L.divIcon({className: '', iconSize: [150, 30], iconAnchor: [15, 15],
+      html: `<div style="display:flex;align-items:center;gap:4px"><div style="width:30px;height:30px;border-radius:50%;background:${col};border:3px solid #fff;box-shadow:0 1px 6px #0009;display:flex;align-items:center;justify-content:center;font-size:15px">🚚</div><span style="background:#fff;padding:1px 6px;border-radius:4px;font:600 11px Segoe UI;box-shadow:0 1px 3px #0005;white-space:nowrap">${esc(t.name)}${i.moving ? ' · ' + Math.round(i.p.vel) + ' km/h' : ''}</span></div>`});
+    const pop = `<b>🚚 ${esc(t.name)}</b> ${esc(t.plate || '')}<br>Driver: ${esc(t.driver || '—')} ${t.phone ? '· ' + esc(t.phone) : ''}<br>${esc(i.text)}<br>
+      Updated ${ago(i.p.tst)}${i.p.batt != null ? ` · 🔋 ${i.p.batt}%` : ''}${i.trip ? `<br>On trip ${i.trip.tripNo}: ${i.trip.stops.map(s => esc(s.client)).join(', ')}` : ''}
+      <br><a href="${gmaps(i.p.lat, i.p.lng)}" target="_blank">Open in Google Maps</a>`;
+    if (liveMarkers[id]) liveMarkers[id].setLatLng([i.p.lat, i.p.lng]).setIcon(icon).setPopupContent(pop);
+    else liveMarkers[id] = L.marker([i.p.lat, i.p.lng], {icon, zIndexOffset: 1000}).bindPopup(pop).addTo(liveLayer);
+  });
+  Object.keys(liveMarkers).forEach(id => { if (!seen.has(id)) { liveLayer.removeLayer(liveMarkers[id]); delete liveMarkers[id]; } });
+}
+function showTruck(truckId) {
+  const t = S.trucks.find(x => x.id === truckId), m = t && liveMarkers[trackIdOf(t)];
+  if (!m || !map) return alert('No live position for this truck yet.');
+  map.setView(m.getLatLng(), Math.max(map.getZoom(), 14)); m.openPopup();
+}
+function fitLive() {
+  const pts = Object.values(liveMarkers).map(m => m.getLatLng());
+  if (!pts.length || !map) return alert('No live positions yet.');
+  map.fitBounds(pts, {padding: [60, 60], maxZoom: 14});
+}
+
+/* ---------- Live tab ---------- */
+function renderLive() {
+  ensureTrackIds();
+  const st = $('#liveStatus'), btn = $('#liveBtn');
+  const dot = {on: '🟢', connecting: '🟡', error: '🔴', off: '⚪'}[liveState];
+  st.innerHTML = `${dot} ${esc(liveMsg || (liveState === 'off' ? 'Not connected – click Connect.' : ''))}`;
+  btn.textContent = liveState === 'off' || liveState === 'error' ? '📡 Connect' : 'Disconnect';
+  const known = new Set(S.trucks.map(trackIdOf));
+  const unknown = Object.keys(LIVE).filter(id => !known.has(id) && LIVE[id].lat != null);
+  $('#liveBody').innerHTML = S.trucks.map(t => { const i = liveInfo(t);
+    return `<tr><td><b>${esc(t.name)}</b><br><span class="muted">${esc(t.driver || '')}</span></td>
+      <td><span class="tag ${i.cls}">${esc(i.text)}</span>${i.p && i.p.tst ? `<br><span class="muted">${ago(i.p.tst)}</span>` : ''}</td>
+      <td>${i.p && i.p.batt != null ? i.p.batt + '%' : ''}</td>
+      <td class="num" style="white-space:nowrap">${i.p && i.p.lat != null ? `<button class="x" title="Show on map" onclick="showTruck('${t.id}')">📍</button>` : ''}
+        <button class="b" onclick="phoneSetup('${t.id}')">📲 Set up phone</button></td></tr>`; }).join('')
+    + unknown.map(id => `<tr><td colspan="4" class="muted">Phone "${esc(id)}" is sending, but no truck has this tracking ID – set it in the Trucks tab.</td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">Add trucks first.</td></tr>';
+}
+function fillLiveSettings() {
+  const T = trk();
+  $('#lBroker').value = T.broker; $('#lTls').value = T.tlsPort; $('#lWs').value = T.wsPort;
+  $('#lCode').value = T.code; $('#lKey').value = T.key; $('#lUser').value = T.user; $('#lPass').value = T.pass; $('#lSetupUrl').value = T.setupUrl || '';
+}
+function saveLiveSettings() {
+  const T = trk();
+  const n = {broker: $('#lBroker').value.trim() || 'broker.hivemq.com', tlsPort: +$('#lTls').value || 8883, wsPort: +$('#lWs').value || 8884,
+    code: slugId($('#lCode').value) || T.code, key: $('#lKey').value.trim() || T.key, user: $('#lUser').value.trim(), pass: $('#lPass').value,
+    setupUrl: $('#lSetupUrl').value.trim()};
+  if (n.setupUrl && !/^https:\/\/\S+$/i.test(n.setupUrl)) return alert('The setup page address must start with https://');
+  if (n.key.length < 12) return alert('The secret key should be at least 12 characters.');
+  const phonesAffected = ['broker', 'tlsPort', 'code', 'key', 'user', 'pass'].some(k => n[k] !== T[k]);
+  Object.assign(T, n); save(); fillLiveSettings();
+  if (phonesAffected) alert('Saved. Because the connection details changed, set up every driver phone again (📲 Set up phone).');
+  if (liveState !== 'off') connectLive();
+}
+function newLiveKey() {
+  if (!confirm('Make a new secret key? Every driver phone must then be set up again.')) return;
+  $('#lKey').value = randStr(24); saveLiveSettings();
+}
+
+/* ---------- phone setup for one truck ---------- */
+function owntracksConfig(t) {
+  const T = trk(), id = trackIdOf(t);
+  const tid = ((t.name.match(/\d+/) || [''])[0] ? 'T' + (t.name.match(/\d+/)[0]).slice(-1) : id.slice(0, 2)).toUpperCase().slice(0, 2);
+  return {_type: 'configuration', mode: 0, host: T.broker, port: T.tlsPort, tls: true, auth: !!T.user, username: T.user || T.code, password: T.pass || '',
+    deviceId: id, tid, clientId: `${T.code}-${id}`, pubTopicBase: `owntracks/${T.code}/${id}`, encryptionKey: T.key,
+    monitoring: 2, moveModeLocatorInterval: 30, locatorInterval: 60, locatorDisplacement: 50, pubRetain: true, pubQos: 1,
+    keepalive: 60, cleanSession: false, sub: false, cmd: false, remoteConfiguration: false};
+}
+const configLink = t => 'owntracks:///config?inline=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(owntracksConfig(t))))));
+const b64url = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const setupLink = t => trk().setupUrl
+  ? trk().setupUrl.replace(/#.*$/, '') + '#c=' + b64url(JSON.stringify(owntracksConfig(t))) + '&n=' + encodeURIComponent(t.name) : '';
+let lastSetupLink = '';
+function saveSetupUrl(v) {
+  v = String(v || '').trim();
+  if (v && !/^https:\/\/\S+$/i.test(v)) return alert('Paste the web address of your setup page – it must start with https://');
+  trk().setupUrl = v; save(); fillLiveSettings();
+  if (setupFor) phoneSetup(setupFor);
+}
+function downloadSetupPage() { download('index.html', $('#setupPageTpl').textContent.replace(/<\\\/script>/g, '<' + '/script>').trim(), 'text/html'); }
+async function copySetupLink(btn) {
+  try { await navigator.clipboard.writeText(lastSetupLink); btn.textContent = '✓ Copied'; }
+  catch (e) { prompt('Copy this link:', lastSetupLink); }
+}
+function phoneSetup(truckId) {
+  setupFor = truckId; const t = S.trucks.find(x => x.id === truckId); if (!t) return;
+  const T = trk(), c = owntracksConfig(t);
+  const phone = String(t.phone || '').replace(/\D/g, '').replace(/^00/, '');
+  const row = (k, v) => `<tr><td class="muted">${k}</td><td><b>${esc(v)}</b></td></tr>`;
+  let top;
+  if (!T.setupUrl) {
+    top = `<div class="warnbox"><b>One-time step (about 5 minutes, free): put the driver setup page online.</b>
+      <ol style="padding-left:18px;margin:8px 0">
+        <li><button class="b" onclick="downloadSetupPage()">⬇ Download setup page</button> – this saves a file called <b>index.html</b>.
+          Make a new folder (e.g. <i>driver-setup</i>) and put the file inside it.</li>
+        <li>Open <a href="https://app.netlify.com/drop" target="_blank"><b>app.netlify.com/drop</b></a>, sign up for free (e-mail), then <b>drag the folder</b> onto that page.</li>
+        <li>Netlify shows your page's address, like <i>https://something-123.netlify.app</i>. Copy it and paste it here:</li>
+      </ol>
+      <div class="row"><input id="suUrl" placeholder="https://something-123.netlify.app"><button class="b p shrink" onclick="saveSetupUrl($('#suUrl').value)">💾 Save</button></div>
+      <p class="hint">You do this only once. The page is the same for every driver and holds no company secrets – each driver's settings
+        travel inside their own link (after the #), which is never sent to the web host. Any free web host works (Netlify, GitHub Pages, your company website…).</p></div>`;
+  } else {
+    lastSetupLink = setupLink(t);
+    const msg = `Hello ${t.driver || ''} 👋\nPlease open this link on your phone to set up live location for ${t.name} (2 minutes):\n${lastSetupLink}\n\n` +
+      `مرحباً، افتح هذا الرابط من هاتفك لإعداد الموقع المباشر للشاحنة ${t.name} واتبع الخطوات (دقيقتان).`;
+    top = `<div class="infobox"><b>Send this link to ${esc(t.driver || 'the driver')}.</b> When they tap it on their phone (iPhone or Android),
+      it helps them install OwnTracks and then opens OwnTracks with all the settings filled in.
+      <div class="actions"><a class="b wa" href="https://wa.me/${phone}?text=${encodeURIComponent(msg)}" target="_blank">📲 Send link by WhatsApp</a>
+        <button class="b" onclick="copySetupLink(this)">📋 Copy link</button>
+        <a class="b" href="${esc(lastSetupLink)}" target="_blank">👁 Preview page</a></div>
+      <div class="hint">Setup page: ${esc(T.setupUrl)} · <a href="#" onclick="if(confirm('Change the setup page address?'))saveSetupUrl('');return false">change</a>
+        · If you change the company code or secret key, send new links to all drivers.</div></div>`;
+  }
+  $('#liveSetup').innerHTML = `<div class="card" style="border:2px solid #25d366">
+    <div class="row" style="justify-content:space-between"><h2 style="flex:0;white-space:nowrap;margin:0">📲 Phone setup – ${esc(t.name)}</h2>
+      <button class="x shrink" style="flex:0" onclick="$('#liveSetup').innerHTML='';setupFor=null">✖</button></div>
+    ${top}
+    <p class="hint">On the phone the page guides the driver: install OwnTracks → tap <b>Open in OwnTracks</b> → allow location <b>"All the time"</b> → choose <b>Move</b> mode.
+      Within a minute the truck appears here and on the map.</p>
+    <details><summary class="muted">Other ways: setup file, or type the settings by hand</summary>
+      <p class="hint"><button class="b" onclick="downloadSetupFile('${t.id}')">⬇ Setup file (.otrc)</button> – send it on WhatsApp; on the phone open it with OwnTracks
+        (Android: OwnTracks ☰ → Configuration management → Import · iPhone: tap the file → Share → OwnTracks).</p>
+      <table style="margin-top:6px">${row('Mode', 'MQTT')}${row('Host', T.broker)}${row('Port', T.tlsPort)}${row('TLS', 'on')}
+        ${row('Authentication', T.user ? 'on' : 'off')}${row('Username / UserID', c.username)}${T.user ? row('Password', '(as in settings)') : ''}
+        ${row('Device ID', c.deviceId)}${row('Tracker ID', c.tid)}${row('Encryption key', T.key)}${row('Base topic (if asked)', c.pubTopicBase)}</table></details>
+  </div>`;
+  $('#side').scrollTop = 0;
+}
+function downloadSetupFile(truckId) {
+  const t = S.trucks.find(x => x.id === truckId);
+  download(`owntracks-${trackIdOf(t)}.otrc`, JSON.stringify(owntracksConfig(t), null, 2), 'application/json');
+}
+
+/* ===================== data ===================== */
+function backup() { download(`mazut-backup-${todayISO()}.json`, JSON.stringify(S, null, 2), 'application/json'); }
+function restore(inp) {
+  const f = inp.files[0]; if (!f) return;
+  f.text().then(t => { try { const d = JSON.parse(t); if (!d.settings || !Array.isArray(d.trucks)) throw 0;
+    S = migrate(d); save(); fillSettings(); renderAll(); drawMap(true); alert('Backup restored.');
+  } catch (e) { alert('This is not a valid backup file.'); } });
+  inp.value = '';
+}
+function resetAll() { if (!confirm('Erase ALL data (orders, clients, trucks, depots, settings)?')) return; S = structuredClone(DEFAULTS); save(); fillSettings(); renderAll(); }
+function loadDemo() {
+  if ((S.requests.length || S.trucks.length || S.clients.length) && !confirm('Replace current data with demo data?')) return;
+  const keepTracking = S.tracking;
+  S = structuredClone(DEFAULTS); S.tracking = keepTracking;
+  S.settings.company = 'Demo Mazut Co.';
+  S.depots = [{id: uid(), name: 'Main depot – Dora', address: 'Dora, Beirut', lat: 33.8869, lng: 35.5442},
+              {id: uid(), name: 'North depot – Tripoli', address: 'Tripoli port', lat: 34.4550, lng: 35.8240}];
+  const [D1, D2] = S.depots.map(d => d.id);
+  S.trucks = [['Truck 1','A-1001','Ahmad',20000,D1],['Truck 2','A-1002','Karim',15000,D1],['Truck 3','A-1003','Samir',10000,D1],
+              ['Truck 4','A-1004','Fadi',5000,D1],['Truck 5','B-2001','Walid',12000,D2]]
+    .map(([name, plate, driver, cap, depotId]) => ({id: uid(), name, plate, driver, phone: '', cap, active: true, depotId}));
+  [['Hotel Al Bahr','Jounieh',33.9808,35.6178,8000],['Kesrouan Bakery','Zouk Mikael',33.9701,35.6122,3000],
+   ['Byblos Hospital','Jbeil',34.1230,35.6519,12000,1],['Amchit School','Amchit',34.1480,35.6440,4000],
+   ['Saida Mill','Saida',33.5630,35.3688,9000],['Damour Farm','Damour',33.7290,35.4540,2500],['Jiyeh Factory','Jiyeh',33.6590,35.4210,6000],
+   ['Zahle Laundry','Zahle',33.8463,35.9020,7000],['Chtaura Hotel','Chtaura',33.8190,35.8560,5000],
+   ['Hamra Building','Beirut Hamra',33.8966,35.4823,3500],['Achrafieh Clinic','Beirut Achrafieh',33.8869,35.5200,2000],
+   ['Tripoli Steel','Tripoli',34.4367,35.8497,25000],['Batroun Resort','Batroun',34.2550,35.6580,6000]
+  ].forEach(([name, address, lat, lng, qty, urgent]) => {
+    const c = {id: uid(), name, phone: '', address, lat, lng, notes: '', depotId: ''}; S.clients.push(c);
+    S.requests.push({id: uid(), active: true, clientId: c.id, client: name, phone: '', address, lat, lng, qty, urgent: !!urgent, notes: '', depotId: ''});
+  });
+  save(); fillSettings(); renderAll(); drawMap(true); showTab('requests');
+}
+function renderAll() { fillDepotSelects(); renderRequests(); renderClients(); renderTrucks(); renderDepots(); renderPlan(); drawMap(); renderLive(); drawLive(); }
+
+fillSettings(); fillLiveSettings(); initPlanInputs(); renderAll(); drawMap(true);
+if (trk().auto) connectLive();
+setInterval(() => { renderLive(); drawLive(); }, 30000);   // refresh 'x min ago'
+if (!S.depots.length && !S.trucks.length && !S.requests.length)
+  setTimeout(() => { if (confirm('Welcome! Load demo data to see how it works?\n(You can erase it later in Settings.)')) loadDemo(); else showTab('depots'); }, 300);
+</script>
+</body>
+</html>
