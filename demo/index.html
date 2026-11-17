@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mazut Dispatch Planner – How it works | pix and dots</title>
+<meta property="og:title" content="Mazut Dispatch Planner – How it works">
+<meta property="og:description" content="See in 8 steps how the software plans mazut deliveries · شاهد كيف يعمل برنامج توزيع المازوت">
+<meta property="og:image" content="https://sammahf85.github.io/mazutdispatchplanner/demo/5-plan.jpg">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<style>
+  *{box-sizing:border-box}
+  :root{--red:#d32f3a;--ink:#1f2128;--muted:#5d6270;--line:#e4e6eb}
+  body{margin:0;font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:var(--ink);background:#f3f4f7;min-height:100vh;display:flex;flex-direction:column}
+  .ar{direction:rtl;text-align:right}
+  header{background:#fff;border-bottom:2px solid var(--red);display:flex;align-items:center;justify-content:space-between;padding:10px 22px;gap:12px;flex-wrap:wrap}
+  header img{height:46px}
+  header .t{text-align:right;line-height:1.25}
+  header .t b{font-size:19px;display:block}
+  header .t span{color:var(--red);font-size:16px;font-weight:600}
+  main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:22px;padding:22px;max-width:1500px;width:100%;margin:0 auto}
+  .stage{position:relative;align-self:start}
+  .frame{position:relative;border-radius:10px;overflow:hidden;box-shadow:0 8px 30px #0003;background:#fff}
+  .frame img{display:block;width:100%;height:auto;transition:opacity .35s}
+  .hl{position:absolute;border:3px solid var(--red);border-radius:8px;box-shadow:0 0 0 9999px #0000;animation:pulse 1.6s infinite;pointer-events:none}
+  .hl b{position:absolute;top:-14px;left:-14px;width:28px;height:28px;border-radius:50%;background:var(--red);color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px #0004}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 #d32f3a66}50%{box-shadow:0 0 0 8px #d32f3a00}}
+  .dim{position:absolute;inset:0;background:#0000;pointer-events:none}
+  .panel{background:#fff;border-radius:10px;box-shadow:0 4px 18px #0001;padding:22px;display:flex;flex-direction:column;gap:14px;align-self:start;position:sticky;top:16px}
+  .count{font-size:13px;color:var(--muted);display:flex;justify-content:space-between}
+  .panel h2{margin:0;font-size:21px;line-height:1.3}
+  .panel h2.ar{color:var(--red);font-size:20px}
+  .panel p{margin:0;font-size:15px;line-height:1.6;color:#333}
+  .panel p.ar{font-size:16px;line-height:1.75}
+  .panel ol{margin:0;padding-left:20px;font-size:14px;line-height:1.6}
+  .panel ol.ar{padding-left:0;padding-right:20px;font-size:15px}
+  .panel ol li::marker{color:var(--red);font-weight:700}
+  hr{border:0;border-top:1px solid var(--line);margin:2px 0}
+  .nav{display:flex;gap:8px;margin-top:4px}
+  .nav button{flex:1;border:0;border-radius:8px;padding:12px;font:600 15px "Segoe UI",Tahoma,Arial;cursor:pointer}
+  .prev{background:#eceef2;color:var(--ink)}
+  .next{background:var(--red);color:#fff}
+  .nav button:disabled{opacity:.4;cursor:default}
+  .play{background:none;border:1px solid var(--line);border-radius:8px;padding:8px;font:14px "Segoe UI";cursor:pointer;color:var(--muted)}
+  .dots{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+  .dots i{width:10px;height:10px;border-radius:50%;background:#d5d8de;cursor:pointer}
+  .dots i.on{background:var(--red);width:26px;border-radius:5px}
+  .cta{display:flex;flex-direction:column;gap:8px}
+  .cta a{display:block;text-align:center;text-decoration:none;border-radius:8px;padding:12px;font-weight:600}
+  .cta .p{background:var(--red);color:#fff}
+  .cta .s{background:#eceef2;color:var(--ink)}
+  .intro{position:absolute;inset:0;background:linear-gradient(180deg,#ffffffee,#ffffffcc);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px}
+  .intro img{width:min(360px,70%);margin-bottom:14px}
+  .intro h1{margin:0;font-size:clamp(24px,3.4vw,40px)}
+  .intro h1 span{color:var(--red)}
+  .intro .ar{text-align:center;font-size:clamp(20px,2.8vw,32px);color:var(--red);font-weight:700;margin:4px 0 12px}
+  .intro p{margin:2px 0;color:var(--muted);font-size:clamp(13px,1.4vw,17px)}
+  footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 0 0 22px;flex-wrap:wrap;margin-top:6px}
+  footer .dotsx{display:flex;gap:10px}
+  footer .dotsx i{width:20px;height:20px;border-radius:50%;background:#c9c9cc;display:block}
+  footer .dotsx i:first-child{background:var(--ink)}
+  footer .bar{background:#2b2b2e;color:#fff;padding:12px 26px;display:flex;gap:40px;align-items:center;font-size:14px;line-height:1.5;flex-wrap:wrap}
+  footer .bar a{color:#fff;text-decoration:none}
+  footer .web{font-weight:600;font-size:16px}
+  main{align-content:start}
+  @media (max-width:980px){main{display:block;padding:12px}.panel{position:static;margin-top:14px}.nav button{font-size:14px;padding:11px 6px}header .t b{font-size:16px}footer{padding:0}footer .dotsx{display:none}footer .bar{width:100%;justify-content:space-between;gap:10px}}
+</style>
+</head>
+<body>
+<header>
+  <a href="https://pixanddots.com"><img src="logo.png" alt="pix and dots – software &amp; technology"></a>
+  <div class="t"><b>Mazut Dispatch Planner – How it works</b><span class="ar">مخطط توزيع المازوت – كيف يعمل</span></div>
+</header>
+
+<main>
+  <div class="stage">
+    <div class="frame" id="frame"><img id="shot" src="5-plan.jpg" alt=""><div id="hls"></div>
+      <div class="intro" id="intro"><img src="logo.png" alt="pix and dots">
+        <h1>Mazut <span>Dispatch</span> Planner</h1><div class="ar">مخطط توزيع المازوت</div>
+        <p>Smart delivery planning for mazut &amp; fuel distribution companies</p>
+        <p class="ar" style="font-size:inherit;color:var(--muted);font-weight:400;margin:2px 0">برنامج ذكي لتخطيط توصيل المازوت والمحروقات</p></div>
+    </div>
+  </div>
+  <aside class="panel">
+    <div class="count"><span id="cnt"></span><span class="ar" id="cntAr"></span></div>
+    <div id="body"></div>
+    <div class="nav"><button class="prev" id="prev">◀ Back · رجوع</button><button class="next" id="next">Next · التالي ▶</button></div>
+    <button class="play" id="play">▶ Play automatically · تشغيل تلقائي</button>
+    <div class="dots" id="dots"></div>
+  </aside>
+</main>
+
+<footer>
+  <div class="dotsx"><i></i><i></i><i></i></div>
+  <div class="bar"><div><b>Tel :</b> <a href="tel:+9613002919">+961 3 002 919</a><br><b>E-Mail :</b> <a href="mailto:pixanddots85@gmail.com">pixanddots85@gmail.com</a></div><a class="web" href="https://pixanddots.com">pixanddots.com</a></div>
+</footer>
+
+<script>
+// Each step: screenshot, highlighted areas (in % of the picture: left, top, width, height), English + Arabic text.
+const STEPS = [
+  {img: '5-plan.jpg', intro: true,
+   en: ['Welcome', 'This short tour shows how a mazut distribution company plans a full day of deliveries in a few minutes. Press <b>Next</b> or <b>Play</b>.'],
+   ar: ['أهلاً بكم', 'هذه الجولة القصيرة تُظهر كيف تخطّط شركة توزيع مازوت ليوم كامل من التسليمات خلال دقائق. اضغط <b>التالي</b> أو <b>تشغيل</b>.']},
+  {img: '4-depots.jpg', hl: [[1, 7.3, 35.5, 48.3], [1, 57, 35.5, 23]],
+   en: ['Step 1 – Your depots', 'Type the depot name, click <b>Find in Google Maps</b> and paste its location. You can have several depots – each order loads at the nearest one.'],
+   ar: ['الخطوة 1 – المستودعات', 'اكتب اسم المستودع، اضغط <b>Find in Google Maps</b> والصق موقعه. يمكنك إضافة عدة مستودعات، وكل طلب يُحمَّل من أقرب مستودع.']},
+  {img: '3-trucks.jpg', hl: [[1, 7.3, 35.5, 41.3], [1, 50.6, 35.5, 35.4]],
+   en: ['Step 2 – Your tanker trucks', 'Add each truck once: <b>tank capacity</b>, driver, phone and home depot. The fleet list shows the total capacity per trip.'],
+   ar: ['الخطوة 2 – الصهاريج', 'أضف كل شاحنة مرة واحدة: <b>سعة الصهريج</b>، اسم السائق، الهاتف والمستودع. وتُظهر لائحة الأسطول السعة الإجمالية لكل رحلة.']},
+  {img: '2-clients.jpg', hl: [[1, 7.3, 35.5, 20.7], [1, 42.5, 35.5, 11]],
+   en: ['Step 3 – Your customers', '<b>(1)</b> Upload your customer list from Excel – Arabic or English column names. <b>(2)</b> Or add one customer and paste the <b>WhatsApp / Google Maps location</b> he sent you.'],
+   ar: ['الخطوة 3 – الزبائن', '<b>(1)</b> ارفع لائحة الزبائن من ملف Excel بعناوين عربية أو إنكليزية. <b>(2)</b> أو أضف زبوناً والصق <b>موقعه من واتساب أو غوغل ماب</b> الذي أرسله لك.']},
+  {img: '1-orders.jpg', hl: [[1, 7.3, 35.5, 19], [1, 40, 35.5, 12], [1, 69, 35.5, 7]],
+   en: ['Step 4 – Today\'s orders', '<b>(1)</b> Upload the orders from Excel, or <b>(2)</b> type the customer name – his saved location fills in – and <b>(3)</b> the quantity in litres. Mark urgent orders.'],
+   ar: ['الخطوة 4 – طلبات اليوم', '<b>(1)</b> ارفع الطلبات من ملف Excel، أو <b>(2)</b> اكتب اسم الزبون فيظهر موقعه المحفوظ، و<b>(3)</b> الكمية بالليتر. وحدّد الطلبات المستعجلة.']},
+  {img: '5-plan.jpg', hl: [[1, 15, 15, 5], [1, 35.6, 35.5, 7]],
+   en: ['Step 5 – One click', '<b>(1)</b> Click <b>Generate trip schedule</b>. <b>(2)</b> In seconds: here 13 orders and 93,000 L become <b>10 trips</b> with an average tank fill of <b>82%</b>.'],
+   ar: ['الخطوة 5 – نقرة واحدة', '<b>(1)</b> اضغط <b>Generate trip schedule</b>. <b>(2)</b> خلال ثوانٍ: هنا 13 طلباً و93,000 ليتر تصبح <b>10 رحلات</b> بمعدل تعبئة <b>82%</b>.']},
+  {img: '5-plan.jpg', hl: [[1, 44, 35.5, 55.5], [38, 6.5, 61.5, 92]],
+   en: ['Step 6 – Every trip, ready', '<b>(1)</b> Each truck gets its trips: leave and return time, and <b>exactly how many litres</b> to unload at each customer. <b>(2)</b> The routes appear on the map, one colour per truck. Print the sheet for the driver.'],
+   ar: ['الخطوة 6 – كل رحلة جاهزة', '<b>(1)</b> لكل شاحنة رحلاتها: وقت الانطلاق والعودة و<b>كمية الليترات بالضبط</b> لكل زبون. <b>(2)</b> تظهر الطرق على الخريطة بلون لكل شاحنة. واطبع الورقة للسائق.']},
+  {img: '6-live.jpg', hl: [[1, 7.6, 35.5, 53.5], [38, 6.5, 61.5, 92]],
+   en: ['Step 7 – Follow the trucks live', '<b>(1)</b> See every driver: moving or stopped, speed, phone battery and last update. <b>(2)</b> Trucks move on the map. The driver only opens <b>one link sent by WhatsApp</b> to set up his phone.'],
+   ar: ['الخطوة 7 – تابع الشاحنات مباشرة', '<b>(1)</b> شاهد كل سائق: متحرك أو متوقف، السرعة، بطارية الهاتف وآخر تحديث. <b>(2)</b> الشاحنات تتحرك على الخريطة. والسائق يفتح فقط <b>رابطاً واحداً عبر واتساب</b> لتجهيز هاتفه.']},
+  {img: '5-plan.jpg', end: true,
+   en: ['Ready to try it?', 'We install the program on your computers, enter your depots and trucks, and train your team.'],
+   ar: ['جاهز للتجربة؟', 'نقوم بتثبيت البرنامج على أجهزتكم، وإدخال المستودعات والشاحنات، وتدريب فريقكم.']}
+];
+const $ = id => document.getElementById(id);
+let cur = 0, timer = null;
+STEPS.forEach(s => { const i = new Image(); i.src = s.img; });
+$('dots').innerHTML = STEPS.map((s, i) => `<i data-i="${i}"></i>`).join('');
+$('dots').onclick = e => { if (e.target.dataset.i) { stop(); show(+e.target.dataset.i); } };
+
+function show(n) {
+  cur = Math.max(0, Math.min(STEPS.length - 1, n));
+  const s = STEPS[cur];
+  if (!$('shot').src.endsWith(s.img)) $('shot').src = s.img;
+  $('intro').style.display = s.intro || s.end ? 'flex' : 'none';
+  $('hls').innerHTML = (s.hl || []).map((h, i) => `<div class="hl" style="left:${h[0]}%;top:${h[1]}%;width:${h[2]}%;height:${h[3]}%"><b>${i + 1}</b></div>`).join('');
+  const steps = STEPS.length - 2;
+  $('cnt').textContent = s.intro ? 'Introduction' : s.end ? 'Contact' : `Step ${cur} of ${steps}`;
+  $('cntAr').textContent = s.intro ? 'مقدمة' : s.end ? 'تواصل' : `الخطوة ${cur} من ${steps}`;
+  let html = `<h2>${s.en[0]}</h2><p>${s.en[1]}</p><hr><h2 class="ar">${s.ar[0]}</h2><p class="ar">${s.ar[1]}</p>`;
+  if (s.end) html += `<div class="cta" style="margin-top:14px">
+      <a class="p" href="https://wa.me/9613002919?text=${encodeURIComponent('Hello, I would like a demo of Mazut Dispatch Planner')}">💬 WhatsApp +961 3 002 919</a>
+      <a class="s" href="mailto:pixanddots85@gmail.com?subject=Mazut%20Dispatch%20Planner">✉ pixanddots85@gmail.com</a>
+      <a class="s" href="Mazut-Dispatch-Planner-Catalogue.pdf">📄 Catalogue (PDF) · الكتيّب</a>
+      <a class="s" href="../">⬇ Try the program · جرّب البرنامج</a></div>`;
+  $('body').innerHTML = html;
+  $('prev').disabled = cur === 0;
+  $('next').disabled = cur === STEPS.length - 1;
+  [...$('dots').children].forEach((d, i) => d.className = i === cur ? 'on' : '');
+}
+function stop() { clearInterval(timer); timer = null; $('play').textContent = '▶ Play automatically · تشغيل تلقائي'; }
+$('prev').onclick = () => { stop(); show(cur - 1); };
+$('next').onclick = () => { stop(); show(cur + 1); };
+$('play').onclick = () => {
+  if (timer) return stop();
+  if (cur === STEPS.length - 1) show(0);
+  $('play').textContent = '⏸ Pause · إيقاف';
+  timer = setInterval(() => { if (cur >= STEPS.length - 1) return stop(); show(cur + 1); }, 9000);
+};
+document.addEventListener('keydown', e => { if (e.key === 'ArrowRight') $('next').click(); if (e.key === 'ArrowLeft') $('prev').click(); });
+show(parseInt(location.hash.slice(1)) || 0);   // e.g. demo/#5 opens step 5
+</script>
+</body>
+</html>
