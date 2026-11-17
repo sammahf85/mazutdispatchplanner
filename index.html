@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mazut Dispatch Planner – Install</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1d2433">
+<meta property="og:title" content="Mazut Dispatch Planner">
+<meta property="og:description" content="Install the Mazut Dispatch Planner app on your computer.">
+<meta property="og:image" content="https://sammahf85.github.io/mazutdispatchplanner/icon-512.png">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",system-ui,Arial,sans-serif;background:#1d2433;color:#1d2433;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .box{background:#fff;border-radius:16px;max-width:560px;width:100%;padding:30px 28px;text-align:center;box-shadow:0 10px 40px #0006}
+  img.logo{width:140px;height:140px}
+  h1{margin:10px 0 4px;font-size:26px}
+  h1 span{color:#c2410c}
+  p{color:#4b5468;line-height:1.5;margin:8px 0}
+  .ar{direction:rtl;font-size:15px}
+  .btn{display:block;width:100%;border:0;border-radius:10px;padding:15px;font:600 18px "Segoe UI",system-ui,Arial;cursor:pointer;text-decoration:none;margin:12px 0 0}
+  .main{background:#c2410c;color:#fff}.main:hover{background:#9a3412}
+  .main[disabled]{background:#cbd2e0;cursor:default}
+  .sec{background:#f1f3f7;color:#1d2433;font-size:15px;padding:12px}.sec:hover{background:#e2e6ee}
+  .msg{border-radius:10px;padding:12px 14px;margin-top:14px;text-align:left;font-size:14px;line-height:1.5}
+  .ok{background:#dcfce7;color:#14532d}.info{background:#fef3c7;color:#713f12}
+  .msg ol{margin:6px 0 0;padding-left:20px}
+  .hide{display:none}
+  small{display:block;color:#8a91a3;margin-top:18px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="box">
+  <img class="logo" src="icon-512.png" alt="Mazut Dispatch Planner logo">
+  <h1>Mazut <span>Dispatch</span> Planner</h1>
+  <p>Plans mazut deliveries: groups nearby orders, fills each tanker, schedules trips and shows the drivers' live locations.</p>
+  <p class="ar">برنامج توزيع المازوت – اضغط الزر لتثبيت البرنامج على الكمبيوتر</p>
+
+  <button id="install" class="btn main" disabled>⏳ Preparing…</button>
+
+  <div id="done" class="msg ok hide">✅ <b>Installed!</b> The app is now on this computer with the orange tanker icon – open it from the <b>Desktop</b>, the <b>Start menu</b> or the taskbar.<br>
+    <span class="ar">✅ تم التثبيت! افتح البرنامج من سطح المكتب أو من قائمة ابدأ.</span></div>
+
+  <div id="manual" class="msg info hide"></div>
+
+  <a class="btn sec" href="MazutDispatch.html">▶ Open the program in the browser (without installing)</a>
+  <a class="btn sec" href="https://github.com/sammahf85/mazutdispatchplanner/archive/refs/heads/main.zip">⬇ Download the offline copy (ZIP)</a>
+
+  <small>Works on Windows, Mac and Linux computers in Chrome or Microsoft Edge. Needs internet for the map, address search and live tracking.<br>
+  Each computer keeps its own orders, clients and trucks. To move data from another computer: there, use ⚙ Settings → ⬇ Save backup file; here, ⚙ Settings → ⬆ Restore backup.</small>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const btn = $('install'), ua = navigator.userAgent;
+const isPhone = /Android|iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isChromium = !!window.chrome || /Edg\//.test(ua);
+const standalone = matchMedia('(display-mode: standalone)').matches;
+let evt = null;
+
+function manual(html) { $('manual').innerHTML = html; $('manual').classList.remove('hide'); }
+function ready() { btn.disabled = false; btn.textContent = '⬇ Install the app on this computer'; }
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+if (standalone) location.replace('MazutDispatch.html');
+
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); evt = e; ready(); $('manual').classList.add('hide'); });
+window.addEventListener('appinstalled', () => { evt = null; btn.disabled = true; btn.textContent = '✅ Installed'; $('done').classList.remove('hide'); $('manual').classList.add('hide'); });
+
+btn.onclick = async () => {
+  if (!evt) return;
+  evt.prompt();
+  const r = await evt.userChoice;
+  if (r.outcome !== 'accepted') { btn.textContent = '⬇ Install the app on this computer'; return; }
+  evt = null;
+};
+
+setTimeout(() => {
+  if (evt) return;
+  btn.disabled = true; btn.textContent = 'Install the app';
+  if (isPhone) {
+    manual('📱 This program is made for a <b>computer</b> (PC or laptop). Send this link to your computer and open it there.<br><span class="ar">هذا البرنامج للكمبيوتر – افتح الرابط على الكمبيوتر.</span>');
+  } else if (!isChromium) {
+    manual('Please open this link in <b>Google Chrome</b> or <b>Microsoft Edge</b> – this browser cannot install apps.<br><span class="ar">افتح هذا الرابط في Chrome أو Edge.</span>');
+  } else {
+    manual('If the app is <b>already installed</b>, open it from the Desktop or Start menu.<br>Otherwise install it from the browser menu:<ol>' +
+      '<li><b>Chrome:</b> click the install icon <b>⊕</b> at the right of the address bar – or menu <b>⋮</b> → <b>Cast, save and share</b> → <b>Install page as app</b>.</li>' +
+      '<li><b>Edge:</b> menu <b>…</b> → <b>Apps</b> → <b>Install this site as an app</b>.</li></ol>');
+  }
+}, 4000);
+</script>
+</body>
+</html>

@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mazut Dispatch Planner</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="theme-color" content="#1d2433">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -83,6 +86,7 @@
 <header>
   <h1>⛽ Mazut <span>Dispatch</span> Planner</h1>
   <div id="company"></div>
+  <button id="installBtn" class="b p" style="display:none" onclick="installApp()" title="Install this program on the computer with its own icon">⬇ Install app</button>
   <nav>
     <button data-tab="requests" class="on">1. Orders</button>
     <button data-tab="clients">2. Clients</button>
@@ -1994,6 +1998,19 @@ function renderAll() { fillDepotSelects(); renderRequests(); renderClients(); re
 fillSettings(); fillLiveSettings(); initPlanInputs(); renderAll(); drawMap(true);
 if (trk().auto) connectLive();
 setInterval(() => { renderLive(); drawLive(); }, 30000);   // refresh 'x min ago'
+/* install as an app (when opened from the website in Chrome / Edge) */
+let installEvt = null;
+function installApp() {
+  if (!installEvt) return;
+  installEvt.prompt();
+  installEvt.userChoice.then(r => { if (r.outcome === 'accepted') { installEvt = null; $('#installBtn').style.display = 'none'; } });
+}
+if (window.addEventListener) {
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('#installBtn').style.display = ''; });
+  window.addEventListener('appinstalled', () => { installEvt = null; $('#installBtn').style.display = 'none'; });
+}
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && location.protocol === 'https:')
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 if (!S.depots.length && !S.trucks.length && !S.requests.length)
   setTimeout(() => { if (confirm('Welcome! Load demo data to see how it works?\n(You can erase it later in Settings.)')) loadDemo(); else showTab('depots'); }, 300);
 </script>
